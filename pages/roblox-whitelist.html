@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="referrer" content="no-referrer">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob: https:; connect-src https://*.supabase.co https://api.ipify.org https://users.roproxy.com; object-src 'none'; base-uri 'none'; frame-ancestors 'none'">
+<title>Andrux Roblox 白名单</title>
+<link rel="stylesheet" href="../assets/styles.css">
+</head>
+<body data-page="roblox-whitelist">
+<section id="appShell" class="app-shell">
+<div class="mobile-bar">
+<button id="mobileMenu" class="menu-btn" aria-label="Menu">菜单</button>
+<strong>Andrux</strong>
+<button id="mobileLogout" class="ghost-btn">退出</button>
+</div>
+<aside id="sidebar" class="sidebar">
+<div class="side-head">
+<div class="brand-mark">AX</div>
+<div class="side-title">
+<strong>Andrux</strong>
+<small>玩家中心</small>
+</div>
+</div>
+<nav class="nav-group" aria-label="Pages">
+<button class="nav-btn" data-page="dashboard" data-href="./dashboard.html"><span>仪表盘</span><span class="nav-code">01</span></button>
+<button class="nav-btn" data-page="game" data-href="./game.html"><span>游戏</span><span class="nav-code">02</span></button>
+<button class="nav-btn" data-page="executor" data-href="./executor.html"><span>执行器</span><span class="nav-code">03</span></button>
+<button class="nav-btn" data-page="community" data-href="./community.html"><span>社区</span><span class="nav-code">04</span></button>
+<button class="nav-btn" data-page="admin" data-href="./admin.html"><span>管理员</span><span class="nav-code">05</span></button>
+<button class="nav-btn" data-page="profile" data-href="./profile.html"><span>主页</span><span class="nav-code">06</span></button>
+<button class="nav-btn" data-page="settings" data-href="./settings.html"><span>设置</span><span class="nav-code">07</span></button>
+<button class="nav-btn active" data-page="roblox-whitelist" data-href="./roblox-whitelist.html"><span>Roblox 白名单</span><span class="nav-code">08</span></button>
+</nav>
+<div class="side-foot">
+<div class="user-card">
+<b id="sideUsername">Player</b>
+<span>已登录</span>
+</div>
+<button id="logoutBtn" class="ghost-btn">退出登录</button>
+</div>
+</aside>
+<main class="content">
+<section id="robloxWhitelistPage" class="page active">
+<div class="page-header">
+<div>
+<span class="eyebrow">Whitelist</span>
+<h2>Roblox 白名单</h2>
+<p class="subtext">绑定 Roblox 账号后，玩家进入任意运行本脚本的服务器将自动执行推送的脚本。最多绑定 5 个账号。</p>
+</div>
+<span id="wlBindCount" class="wl-badge">0/5</span>
+</div>
+<style>
+.wl-badge{display:inline-flex;align-items:center;justify-content:center;min-width:36px;height:24px;padding:0 10px;border-radius:12px;background:var(--accent);color:#fff;font-size:12px;font-weight:600}
+.wl-input{width:100%;padding:10px;border:1px solid var(--rule);border-radius:12px;background:var(--surface);color:var(--ink);font-size:14px;box-sizing:border-box}
+.wl-input:focus{outline:none;border-color:var(--accent)}
+.wl-add-toggle{border:2px dashed var(--rule);border-radius:12px;padding:14px;text-align:center;cursor:pointer;transition:border-color .2s,color .2s;color:var(--muted);font-size:14px}
+.wl-add-toggle:hover{border-color:var(--accent);color:var(--accent)}
+.wl-account-item{display:flex;align-items:center;gap:12px;padding:12px 14px;border:1px solid var(--rule);border-radius:14px;background:rgba(255,255,255,0.52);margin-bottom:8px;transition:border-color .2s}
+.wl-account-item:hover{border-color:var(--accent)}
+.wl-avatar{width:42px;height:42px;border-radius:50%;object-fit:cover;flex-shrink:0;background:var(--rule)}
+.wl-avatar-fallback{width:42px;height:42px;border-radius:50%;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:600;flex-shrink:0}
+.wl-unbind-btn{padding:6px 14px;font-size:12px;border-radius:10px;background:transparent;border:1px solid var(--bad);color:var(--bad);cursor:pointer;transition:background .2s,color .2s;flex-shrink:0}
+.wl-unbind-btn:hover{background:var(--bad);color:#fff}
+.wl-pending-badge{font-size:11px;color:var(--accent2);background:rgba(32,58,51,0.08);padding:2px 8px;border-radius:8px;margin-left:6px}
+</style>
+<div class="card">
+<div class="admin-card-head">
+<div>
+<span class="eyebrow">Accounts</span>
+<h3>已绑定账号</h3>
+</div>
+</div>
+<div id="wlAccountArea" style="margin:16px 0;min-height:60px"></div>
+<div id="wlAddToggle" class="wl-add-toggle">+ 添加账号</div>
+<div id="wlAddForm" style="display:none;margin-top:12px">
+<input id="wlBindInput" type="text" autocomplete="off" placeholder="输入 Roblox 用户名" spellcheck="false" class="wl-input" style="margin-bottom:10px">
+<div style="display:flex;gap:8px;justify-content:flex-end">
+<button id="wlCancelAdd" class="ghost-btn" type="button">取消</button>
+<button id="wlBindBtn" class="primary-btn" type="button">添加</button>
+</div>
+</div>
+</div>
+</section>
+</main>
+</section>
+<div id="toast" class="toast">提示</div>
+<script src="../assets/i18n.js?v=13"></script>
+<script src="../assets/polyfill.js?v=13"></script>
+<script src="../assets/page-app.js"></script>
+<script src="../assets/game-fix.js?v=12"></script>
+<script src="../assets/roblox-whitelist.js?v=4"></script>
+</body>
+</html>

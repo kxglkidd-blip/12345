@@ -1,0 +1,42 @@
+{
+  "name": "andrux-dashboard",
+  "version": "1.0.0",
+  "description": "Andrux 玩家控制台",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --win"
+  },
+  "devDependencies": {
+    "electron": "^31.0.0",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "com.andrux.dashboard",
+    "productName": "Andrux",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "andrux-dashboard.html",
+      "index.html",
+      "assets/**/*",
+      "pages/**/*",
+      "_shared/**/*"
+    ],
+    "win": {
+      "target": [
+        "dir",
+        "zip"
+      ],
+      "signAndEditExecutable": false
+    }
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.5.0",
+    "@capacitor/cli": "^7.6.8",
+    "@capacitor/core": "^8.5.0"
+  }
+}

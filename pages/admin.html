@@ -1,0 +1,153 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="referrer" content="no-referrer">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob: https:; connect-src https://*.supabase.co https://api.ipify.org; object-src 'none'; base-uri 'none'; frame-ancestors 'none'">
+<title>Andrux Admin</title>
+<link rel="stylesheet" href="../assets/styles.css">
+</head>
+<body data-page="admin">
+<section id="appShell" class="app-shell">
+<div class="mobile-bar">
+<button id="mobileMenu" class="menu-btn" aria-label="Menu" data-i18n="nav.menu">菜单</button>
+<strong>Andrux</strong>
+<button id="mobileLogout" class="ghost-btn" data-i18n="nav.exit">退出</button>
+</div>
+<aside id="sidebar" class="sidebar">
+<div class="side-head">
+<div class="brand-mark">AX</div>
+<div class="side-title">
+<strong>Andrux</strong>
+<small data-i18n="nav.player_center">玩家中心</small>
+</div>
+</div>
+<nav class="nav-group" aria-label="Pages">
+<button class="nav-btn" data-page="dashboard" data-href="./dashboard.html"><span data-i18n="nav.dashboard">仪表盘</span><span class="nav-code">01</span></button>
+<button class="nav-btn" data-page="game" data-href="./game.html"><span data-i18n="nav.game">游戏</span><span class="nav-code">02</span></button>
+<button class="nav-btn" data-page="executor" data-href="./executor.html"><span data-i18n="nav.executor">执行器</span><span class="nav-code">03</span></button>
+<button class="nav-btn" data-page="community" data-href="./community.html"><span data-i18n="nav.community">社区</span><span class="nav-code">04</span></button>
+<button class="nav-btn active" data-page="admin" data-href="./admin.html"><span data-i18n="nav.admin">管理员</span><span class="nav-code">05</span></button>
+<button class="nav-btn" data-page="profile" data-href="./profile.html"><span data-i18n="nav.profile">主页</span><span class="nav-code">06</span></button>
+<button class="nav-btn" data-page="settings" data-href="./settings.html"><span data-i18n="nav.settings">设置</span><span class="nav-code">07</span></button>
+<button class="nav-btn" data-page="roblox-whitelist" data-href="./roblox-whitelist.html"><span>Roblox 白名单</span><span class="nav-code">08</span></button>
+</nav>
+<div class="side-foot">
+<div class="user-card">
+<b id="sideUsername">Player</b>
+<span data-i18n="nav.logged_in">已登录，社区权限已开启</span>
+</div>
+<button id="logoutBtn" class="ghost-btn" data-i18n="nav.logout">退出登录</button>
+</div>
+</aside>
+<main class="content">
+<section id="adminPage" class="page active">
+<div class="page-header">
+<div>
+<span class="eyebrow" data-i18n="admin.eyebrow">Admin</span>
+<h2 data-i18n="admin.title">Restricted</h2>
+</div>
+</div>
+<div id="adminLock" class="card admin-lock">
+<form id="adminLoginForm" class="auth-form">
+<div class="field">
+<label for="adminPassword" data-i18n="admin.password_label">请输入密码</label>
+<input id="adminPassword" type="password" autocomplete="off">
+</div>
+<button class="primary-btn" type="submit" data-i18n="admin.enter">进入</button>
+<div id="adminNotice" class="notice" data-i18n="val.enter_password">请输入密码</div>
+</form>
+</div>
+<div id="adminPanel" class="admin-panel hidden">
+<div class="card admin-global-card">
+<div class="admin-card-head">
+<div>
+<span class="eyebrow" data-i18n="admin.global_mute">Global</span>
+<h3 data-i18n="admin.global_mute">全员禁言</h3>
+<p id="globalMuteStatus" class="subtext" data-i18n="admin.mute_status_off">当前未开启全员禁言。</p>
+</div>
+<button id="adminRefreshGlobal" class="ghost-btn" type="button" data-i18n="admin.refresh">刷新</button>
+</div>
+<div class="admin-actions">
+<button class="mini-btn danger" data-global-mute="10" data-i18n="admin.mute_10">全员10分钟</button>
+<button class="mini-btn danger" data-global-mute="60" data-i18n="admin.mute_60">全员1小时</button>
+<button class="mini-btn danger" data-global-mute="forever" data-i18n="admin.mute_forever">永久全员</button>
+<input id="globalMuteMinutes" class="admin-mini-input" type="number" min="1" max="10080" data-i18n-ph="admin.mute_minutes_ph" placeholder="分钟">
+<button class="mini-btn danger" data-global-mute="custom" data-i18n="admin.mute_custom">自定义全员</button>
+<button class="mini-btn" data-global-mute="off" data-i18n="admin.mute_off">关闭全员禁言</button>
+</div>
+</div>
+<div class="card">
+<div class="admin-card-head">
+<div>
+<span class="eyebrow" data-i18n="admin.ip_ban">IP Ban</span>
+<h3 data-i18n="admin.ip_ban">IP 封禁管理</h3>
+</div>
+<button class="ghost-btn" type="button" id="refreshBannedIps" data-i18n="admin.refresh">刷新</button>
+</div>
+<div class="admin-actions">
+<input id="manualBanIp" class="admin-mini-input" type="text" data-i18n-ph="admin.ip_input_ph" placeholder="输入 IP 地址" autocomplete="off" style="flex:1;">
+<button id="manualBanBtn" class="mini-btn danger" data-i18n="admin.ip_ban_btn">封锁IP</button>
+<button id="manualUnbanBtn" class="mini-btn" data-i18n="admin.ip_unban_btn">解封IP</button>
+</div>
+<div id="bannedIpList" class="admin-list" style="margin-top:8px;"></div>
+</div>
+<div class="card" style="margin-bottom:18px">
+<div class="admin-card-head">
+<div>
+<span class="eyebrow" data-i18n="admin.game_mgmt">Games</span>
+<h3 data-i18n="admin.game_mgmt">游戏管理</h3>
+</div>
+<div>
+<label style="margin-right:10px"><input type="checkbox" id="adminShowHiddenGames" style="vertical-align:middle"> <span data-i18n="admin.show_hidden">显示已隐藏</span></label>
+<button id="adminRefreshGames" class="ghost-btn" type="button" data-i18n="admin.refresh">刷新</button>
+</div>
+</div>
+<div id="adminGames" class="admin-list"></div>
+</div>
+<div class="grid admin-grid">
+<div class="card">
+<div class="admin-card-head">
+<div>
+<span class="eyebrow" data-i18n="admin.player_mgmt">Players</span>
+<h3 data-i18n="admin.player_mgmt">玩家管理</h3>
+</div>
+<button id="adminRefreshUsers" class="ghost-btn" type="button" data-i18n="admin.refresh">刷新</button>
+</div>
+<div id="adminUsers" class="admin-list"></div>
+</div>
+<div class="card">
+<div class="admin-card-head">
+<div>
+<span class="eyebrow" data-i18n="admin.community_mgmt">Community</span>
+<h3 data-i18n="admin.community_mgmt">社区管理</h3>
+</div>
+<select id="adminChannel" class="admin-select">
+<option value="general" data-i18n="comm.channel_general">普通聊天区</option>
+<option value="scripts" data-i18n="comm.channel_scripts">脚本区</option>
+<option value="require" data-i18n="comm.channel_require">Require 区</option>
+</select>
+</div>
+<div id="adminMessages" class="admin-list"></div>
+</div>
+</div>
+</div>
+</section>
+</main>
+</section>
+<div id="contextMenu" class="context-menu">
+<button data-action="recall" data-i18n="comm.recall">撤回</button>
+<button data-action="quote" data-i18n="comm.quote">引用</button>
+<button data-action="copy" data-i18n="comm.copy">复制</button>
+</div>
+<div id="fileContextMenu" class="context-menu">
+<button data-file-action="remove" data-i18n="comm.file_remove">删除文件</button>
+</div>
+<div id="toast" class="toast" data-i18n="misc.notice">提示</div>
+<script src="../assets/i18n.js?v=13"></script>
+<script src="../assets/polyfill.js?v=13"></script>
+<script src="../assets/page-app.js"></script>
+<script src="../assets/game-fix.js?v=12"></script>
+</body>
+</html>

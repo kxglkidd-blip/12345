@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="referrer" content="no-referrer">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob: https:; connect-src https://*.supabase.co https://api.ipify.org https://users.roproxy.com; object-src 'none'; base-uri 'none'; frame-ancestors 'none'">
+<title>Andrux Executor</title>
+<link rel="stylesheet" href="../assets/styles.css">
+</head>
+<body data-page="executor">
+<section id="appShell" class="app-shell">
+<div class="mobile-bar">
+<button id="mobileMenu" class="menu-btn" aria-label="Menu" data-i18n="nav.menu">菜单</button>
+<strong>Andrux</strong>
+<button id="mobileLogout" class="ghost-btn" data-i18n="nav.exit">退出</button>
+</div>
+<aside id="sidebar" class="sidebar">
+<div class="side-head">
+<div class="brand-mark">AX</div>
+<div class="side-title">
+<strong>Andrux</strong>
+<small data-i18n="nav.player_center">玩家中心</small>
+</div>
+</div>
+<nav class="nav-group" aria-label="Pages">
+<button class="nav-btn" data-page="dashboard" data-href="./dashboard.html"><span data-i18n="nav.dashboard">仪表盘</span><span class="nav-code">01</span></button>
+<button class="nav-btn" data-page="game" data-href="./game.html"><span data-i18n="nav.game">游戏</span><span class="nav-code">02</span></button>
+<button class="nav-btn active" data-page="executor" data-href="./executor.html"><span data-i18n="nav.executor">执行器</span><span class="nav-code">03</span></button>
+<button class="nav-btn" data-page="community" data-href="./community.html"><span data-i18n="nav.community">社区</span><span class="nav-code">04</span></button>
+<button class="nav-btn" data-page="admin" data-href="./admin.html"><span data-i18n="nav.admin">管理员</span><span class="nav-code">05</span></button>
+<button class="nav-btn" data-page="profile" data-href="./profile.html"><span data-i18n="nav.profile">主页</span><span class="nav-code">06</span></button>
+<button class="nav-btn" data-page="settings" data-href="./settings.html"><span data-i18n="nav.settings">设置</span><span class="nav-code">07</span></button>
+<button class="nav-btn" data-page="roblox-whitelist" data-href="./roblox-whitelist.html"><span>Roblox 白名单</span><span class="nav-code">08</span></button>
+</nav>
+<div class="side-foot">
+<div class="user-card">
+<b id="sideUsername">Player</b>
+<span data-i18n="nav.logged_in">已登录，社区权限已开启</span>
+</div>
+<button id="logoutBtn" class="ghost-btn" data-i18n="nav.logout">退出登录</button>
+</div>
+</aside>
+<main class="content">
+<section id="executorPage" class="page active">
+<div class="page-header">
+<div>
+<span class="eyebrow" data-i18n="exec.eyebrow">Executor</span>
+<h2 data-i18n="exec.title">脚本执行器</h2>
+<p class="subtext" data-i18n="exec.desc">向在线 Roblox 服务器推送 Lua 脚本，脚本将在下一次心跳时被执行并清空队列。</p>
+</div>
+</div>
+<div id="execLock" class="card admin-lock">
+<form id="execLoginForm" class="auth-form">
+<div class="field">
+<label for="execPassword" data-i18n="exec.password_label">请输入管理员密码</label>
+<input id="execPassword" type="password" autocomplete="off">
+</div>
+<button class="primary-btn" type="submit" data-i18n="exec.enter">进入</button>
+<div id="execNotice" class="notice" data-i18n="val.enter_password">请输入密码</div>
+</form>
+</div>
+<div id="execPanel" class="hidden">
+<div class="exec-layout">
+<div class="card exec-game-card">
+<div class="admin-card-head">
+<div>
+<span class="eyebrow" data-i18n="exec.target">Target</span>
+<h3 data-i18n="exec.target">目标服务器</h3>
+</div>
+<button id="execRefreshGames" class="ghost-btn" type="button" data-i18n="admin.refresh">刷新</button>
+</div>
+<div id="execGameList" class="exec-game-list"></div>
+</div>
+<div class="card exec-editor-card">
+<div class="admin-card-head">
+<div>
+<span class="eyebrow" data-i18n="exec.eyebrow">Script</span>
+<h3 data-i18n="exec.script_editor">脚本编辑器</h3>
+</div>
+<div id="execCharCount" style="color:var(--muted);font-size:12px" data-i18n="exec.char_count">0 字符</div>
+</div>
+<div class="exec-mode-tabs" style="display:flex;gap:0;margin-bottom:14px;border-radius:10px;overflow:hidden;border:1px solid var(--rule)">
+<button class="exec-mode-btn active" data-mode="lua" type="button" style="flex:1;padding:9px;border:none;background:var(--accent);color:#fff;font-size:13px;cursor:pointer;font-weight:600;transition:background .2s,color .2s">Lua</button>
+<button class="exec-mode-btn" data-mode="require" type="button" style="flex:1;padding:9px;border:none;background:var(--surface);color:var(--muted);font-size:13px;cursor:pointer;font-weight:600;transition:background .2s,color .2s">Require</button>
+</div>
+<div id="execLuaPanel">
+<textarea id="execScriptInput" class="exec-editor selectable" data-i18n-ph="exec.placeholder" placeholder="在此输入 Lua 脚本..." spellcheck="false"></textarea>
+<div class="exec-actions">
+<button id="execSendBtn" class="primary-btn" type="button" data-i18n="exec.push">推送执行</button>
+<button id="execClearBtn" class="ghost-btn" type="button" data-i18n="exec.clear">清空编辑器</button>
+</div>
+<div id="execStatus" class="notice" data-i18n="exec.status_idle">选择一个在线服务器，输入脚本后推送。</div>
+<div class="hint" style="margin-top:10px">需要开启 LoadStringEnabled，直接输入 Lua 代码。</div>
+</div>
+<div id="execRequirePanel" style="display:none">
+<div class="field" style="margin-bottom:12px">
+<label for="execRequireGame" style="display:block;margin-bottom:6px;font-size:13px;color:var(--muted)">目标服务器</label>
+<select id="execRequireGame" style="width:100%;padding:10px;border:1px solid var(--rule);border-radius:12px;background:var(--surface);color:var(--ink);font-size:14px;box-sizing:border-box">
+<option value="">加载中...</option>
+</select>
+</div>
+<div class="field" style="margin-bottom:12px">
+<label for="execRequireInput" style="display:block;margin-bottom:6px;font-size:13px;color:var(--muted)">资产 ID</label>
+<input id="execRequireInput" type="text" autocomplete="off" placeholder="12345 或 12345.func 或 12345:method" spellcheck="false" style="width:100%;padding:10px;border:1px solid var(--rule);border-radius:12px;background:var(--surface);color:var(--ink);font-size:14px;box-sizing:border-box">
+</div>
+<div class="field" style="margin-bottom:12px">
+<label for="execRequireUser" style="display:block;margin-bottom:6px;font-size:13px;color:var(--muted)">玩家用户名</label>
+<input id="execRequireUser" type="text" autocomplete="off" placeholder="Roblox 玩家用户名（传给脚本的参数）" spellcheck="false" style="width:100%;padding:10px;border:1px solid var(--rule);border-radius:12px;background:var(--surface);color:var(--ink);font-size:14px;box-sizing:border-box">
+</div>
+<div class="exec-actions">
+<button id="execRequireSendBtn" class="primary-btn" type="button">推送执行</button>
+<button id="execRequireClearBtn" class="ghost-btn" type="button">清空</button>
+<button id="execRequireRefreshBtn" class="ghost-btn" type="button">刷新服务器</button>
+</div>
+<div id="execRequireStatus" class="notice">选择服务器，输入资产 ID 和玩家用户名后推送。无需 LoadStringEnabled。</div>
+<div class="hint" style="margin-top:10px">格式：12345 = require(12345) | 12345:run = require(12345):run("用户名") | 用户名会作为参数传给脚本方法</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+</main>
+</section>
+<div id="toast" class="toast" data-i18n="misc.notice">提示</div>
+<script src="../assets/i18n.js?v=13"></script>
+<script src="../assets/polyfill.js?v=13"></script>
+<script src="../assets/page-app.js"></script>
+<script src="../assets/game-fix.js?v=12"></script>
+<script src="../assets/exec-asset.js?v=4"></script>
+</body>
+</html>

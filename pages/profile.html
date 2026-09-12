@@ -1,0 +1,93 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="referrer" content="no-referrer">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob: https:; connect-src https://*.supabase.co https://api.ipify.org; object-src 'none'; base-uri 'none'; frame-ancestors 'none'">
+<title>Andrux Profile</title>
+<link rel="stylesheet" href="../assets/styles.css">
+</head>
+<body data-page="profile">
+<section id="appShell" class="app-shell">
+<div class="mobile-bar">
+<button id="mobileMenu" class="menu-btn" aria-label="Menu" data-i18n="nav.menu">菜单</button>
+<strong>Andrux</strong>
+<button id="mobileLogout" class="ghost-btn" data-i18n="nav.exit">退出</button>
+</div>
+<aside id="sidebar" class="sidebar">
+<div class="side-head">
+<div class="brand-mark">AX</div>
+<div class="side-title">
+<strong>Andrux</strong>
+<small data-i18n="nav.player_center">玩家中心</small>
+</div>
+</div>
+<nav class="nav-group" aria-label="Pages">
+<button class="nav-btn" data-page="dashboard" data-href="./dashboard.html"><span data-i18n="nav.dashboard">仪表盘</span><span class="nav-code">01</span></button>
+<button class="nav-btn" data-page="game" data-href="./game.html"><span data-i18n="nav.game">游戏</span><span class="nav-code">02</span></button>
+<button class="nav-btn" data-page="executor" data-href="./executor.html"><span data-i18n="nav.executor">执行器</span><span class="nav-code">03</span></button>
+<button class="nav-btn" data-page="community" data-href="./community.html"><span data-i18n="nav.community">社区</span><span class="nav-code">04</span></button>
+<button class="nav-btn" data-page="admin" data-href="./admin.html"><span data-i18n="nav.admin">管理员</span><span class="nav-code">05</span></button>
+<button class="nav-btn active" data-page="profile" data-href="./profile.html"><span data-i18n="nav.profile">主页</span><span class="nav-code">06</span></button>
+<button class="nav-btn" data-page="settings" data-href="./settings.html"><span data-i18n="nav.settings">设置</span><span class="nav-code">07</span></button>
+<button class="nav-btn" data-page="roblox-whitelist" data-href="./roblox-whitelist.html"><span>Roblox 白名单</span><span class="nav-code">08</span></button>
+</nav>
+<div class="side-foot">
+<div class="user-card">
+<b id="sideUsername">Player</b>
+<span data-i18n="nav.logged_in">已登录，社区权限已开启</span>
+</div>
+<button id="logoutBtn" class="ghost-btn" data-i18n="nav.logout">退出登录</button>
+</div>
+</aside>
+<main class="content">
+<section id="profilePage" class="page active">
+<div class="page-header">
+<div>
+<span class="eyebrow" data-i18n="profile.eyebrow">Profile</span>
+<h2 id="profileTitle" data-i18n="profile.title">个人主页</h2>
+</div>
+<div id="profileActions" class="profile-actions hidden">
+<button id="editProfileBtn" class="ghost-btn" type="button" data-i18n="profile.edit">编辑主页</button>
+<button id="saveProfileBtn" class="primary-btn hidden" type="button" data-i18n="profile.save">保存</button>
+<button id="cancelEditBtn" class="ghost-btn hidden" type="button" data-i18n="profile.cancel">取消</button>
+</div>
+</div>
+<div id="profileContent" class="profile-content">
+<div class="card profile-card">
+<div class="profile-header">
+<div id="profileAvatar" class="profile-avatar"></div>
+<div class="profile-info">
+<h3 id="profileName">Player</h3>
+<p id="profileBio" class="profile-bio"></p>
+<p id="profileMeta" class="profile-meta"></p>
+</div>
+</div>
+</div>
+<div id="profileEditForm" class="card profile-edit-form hidden">
+<div class="field">
+<label for="editBio" data-i18n="profile.bio_label">个人简介</label>
+<textarea id="editBio" maxlength="500" data-i18n-ph="profile.bio_ph" placeholder="介绍一下自己..."></textarea>
+</div>
+<div class="field">
+<label for="editAvatarText" data-i18n="profile.avatar_text_label">头像文字（1-2个字符）</label>
+<input id="editAvatarText" type="text" maxlength="2" data-i18n-ph="profile.avatar_text_ph" placeholder="如首字母">
+</div>
+<div class="field">
+<label data-i18n="profile.avatar_color_label">头像颜色</label>
+<div id="colorPicker" class="color-picker"></div>
+</div>
+<button id="saveProfileBtn2" class="primary-btn" type="button" data-i18n="profile.save">保存</button>
+</div>
+</div>
+</section>
+</main>
+</section>
+<div id="toast" class="toast" data-i18n="misc.notice">提示</div>
+<script src="../assets/i18n.js?v=13"></script>
+<script src="../assets/polyfill.js?v=13"></script>
+<script src="../assets/page-app.js"></script>
+<script src="../assets/game-fix.js?v=12"></script>
+</body>
+</html>
