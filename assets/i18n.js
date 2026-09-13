@@ -295,6 +295,9 @@ window.I18N = {
       'set.clear': '清空',
       'set.language': '语言',
       'set.language_desc': '切换界面语言，所有文字和提示会立即生效。',
+      'set.game_filter': '游戏',
+      'set.hide_offline': '不显示不在线游戏',
+      'set.hide_offline_desc': '开启后游戏页面只显示在线游戏，不在线的游戏会被隐藏。如果隐藏的游戏上线会自动显示，在线的游戏下线会自动隐藏。',
 
       /* ===== Toast / Dynamic messages ===== */
       'toast.key_blocked': '该快捷键已被页面拦截。',
@@ -442,10 +445,47 @@ window.I18N = {
       'profile.joined': '注册时间',
       'profile.msgs_count': '消息数',
 
+      /* ===== Roblox Whitelist ===== */
+      'rbx.eyebrow': 'Roblox',
+      'rbx.title': 'Roblox 白名单',
+      'rbx.desc': '绑定你的 Roblox 用户名，获得执行器权限。绑定后加入游戏时自动获得执行器 UI。',
+      'rbx.bind_label': 'Roblox 用户名',
+      'rbx.bind_ph': '输入你的 Roblox 用户名',
+      'rbx.bind_btn': '绑定',
+      'rbx.unbind_btn': '解绑',
+      'rbx.status_bound': '已绑定',
+      'rbx.status_unbound': '未绑定',
+      'rbx.status_checking': '检查中...',
+      'rbx.current': '当前绑定',
+      'rbx.notice': '执行器 UI 会在你加入游戏后自动出现。按右 Shift 可以开关窗口。',
+      'rbx.bind_ok': '绑定成功',
+      'rbx.bind_fail': '绑定失败',
+      'rbx.unbind_ok': '解绑成功',
+      'rbx.unbind_fail': '解绑失败',
+      'rbx.empty_name': '请输入 Roblox 用户名',
+      'rbx.name_taken': '该用户名已被绑定',
+      'rbx.invalid_name': '用户名格式不正确',
+      'rbx.add_account': '+ 添加账号',
+      'rbx.please_login': '请先登录',
+      'rbx.load_fail': '加载失败',
+      'rbx.no_accounts_title': '还没有绑定账号',
+      'rbx.no_accounts_desc': '在下方添加你的第一个 Roblox 账号',
+      'rbx.pending_exec': ' 待执行',
+      'rbx.unbind': '解绑',
+      'rbx.binding': '添加中...',
+      'rbx.binded': '已绑定: ',
+      'rbx.limit_reached': '已绑定5个，请先解绑',
+      'rbx.already_bound': '已绑定过此用户名',
+      'rbx.bind_fail_prefix': '绑定失败: ',
+      'rbx.unbind_confirm': '确定解绑 ',
+      'rbx.unbinded': '已解绑: ',
+      'rbx.name_too_long': '用户名过长（最多20字符）',
+
       /* ===== Misc ===== */
       'misc.notice': '提示',
       'misc.download': '下载',
       'misc.reply': 'REPLY',
+      'misc.cancel': '取消',
       'misc.no_msgs': '当前分区还没有消息，发送第一条干净的内容。',
       'misc.read_error': '无法读取消息，请确认已执行 SQL 建表并开启策略。',
       'misc.script_pushed': '已推送到 ',
@@ -647,6 +687,9 @@ window.I18N = {
       'set.clear': 'Clear',
       'set.language': 'Language',
       'set.language_desc': 'Switch interface language. All text and prompts update instantly.',
+      'set.game_filter': 'Games',
+      'set.hide_offline': 'Hide offline games',
+      'set.hide_offline_desc': 'When enabled, the game page only shows online games. Offline games are hidden. If a hidden game comes online, it appears automatically. If an online game goes offline, it is hidden.',
 
       /* ===== Toast / Dynamic messages ===== */
       'toast.key_blocked': 'This shortcut is blocked by the page.',
@@ -794,10 +837,47 @@ window.I18N = {
       'profile.joined': 'Joined',
       'profile.msgs_count': 'Messages',
 
+      /* ===== Roblox Whitelist ===== */
+      'rbx.eyebrow': 'Roblox',
+      'rbx.title': 'Roblox Whitelist',
+      'rbx.desc': 'Link your Roblox username to get executor access. The executor UI appears automatically when you join a game.',
+      'rbx.bind_label': 'Roblox Username',
+      'rbx.bind_ph': 'Enter your Roblox username',
+      'rbx.bind_btn': 'Bind',
+      'rbx.unbind_btn': 'Unbind',
+      'rbx.status_bound': 'Bound',
+      'rbx.status_unbound': 'Not bound',
+      'rbx.status_checking': 'Checking...',
+      'rbx.current': 'Current binding',
+      'rbx.notice': 'The executor UI appears automatically when you join a game. Press Right Shift to toggle.',
+      'rbx.bind_ok': 'Bound successfully',
+      'rbx.bind_fail': 'Bind failed',
+      'rbx.unbind_ok': 'Unbound successfully',
+      'rbx.unbind_fail': 'Unbind failed',
+      'rbx.empty_name': 'Please enter Roblox username',
+      'rbx.name_taken': 'This username is already bound',
+      'rbx.invalid_name': 'Invalid username format',
+      'rbx.add_account': '+ Add Account',
+      'rbx.please_login': 'Please login first',
+      'rbx.load_fail': 'Failed to load',
+      'rbx.no_accounts_title': 'No accounts bound yet',
+      'rbx.no_accounts_desc': 'Add your first Roblox account below',
+      'rbx.pending_exec': ' pending',
+      'rbx.unbind': 'Unbind',
+      'rbx.binding': 'Adding...',
+      'rbx.binded': 'Bound: ',
+      'rbx.limit_reached': '5 accounts max, unbind one first',
+      'rbx.already_bound': 'This username is already bound',
+      'rbx.bind_fail_prefix': 'Bind failed: ',
+      'rbx.unbind_confirm': 'Unbind ',
+      'rbx.unbinded': 'Unbound: ',
+      'rbx.name_too_long': 'Username too long (max 20 chars)',
+
       /* ===== Misc ===== */
       'misc.notice': 'Notice',
       'misc.download': 'Download',
       'misc.reply': 'REPLY',
+      'misc.cancel': 'Cancel',
       'misc.no_msgs': 'No messages in this channel yet. Send the first clean message.',
       'misc.read_error': 'Cannot read messages. Make sure SQL tables and policies are set up.',
       'misc.script_pushed': 'Pushed to ',
@@ -824,6 +904,26 @@ window.I18N = {
     this.lang = lang;
     localStorage.setItem('andrux_lang', lang);
     this.apply();
+    var t = document.getElementById('toast');
+    if (t) {
+      t.textContent = this.t('toast.lang_updated');
+      t.classList.add('show');
+      clearTimeout(window._i18nToastT);
+      window._i18nToastT = setTimeout(function() { t.classList.remove('show'); }, 2000);
+    }
+  },
+
+  /* Update active state on language buttons */
+  updateLangBtns: function() {
+    var self = this;
+    document.querySelectorAll('.lang-btn').forEach(function(btn) {
+      var l = btn.getAttribute('data-lang');
+      if (l === self.lang) {
+        btn.classList.add('active');
+      } else {
+        btn.classList.remove('active');
+      }
+    });
   },
 
   /* Apply translations to all [data-i18n] elements */
@@ -838,5 +938,41 @@ window.I18N = {
       var key = el.getAttribute('data-i18n-ph');
       el.setAttribute('placeholder', window.I18N.t(key));
     });
+    this.updateLangBtns();
+  },
+
+  /* Bind language switcher buttons */
+  bindLangBtns: function() {
+    var self = this;
+    document.querySelectorAll('.lang-btn').forEach(function(btn) {
+      if (btn.__i18nBound) return;
+      btn.__i18nBound = true;
+      btn.addEventListener('click', function() {
+        var l = btn.getAttribute('data-lang');
+        if (l && l !== self.lang) {
+          self.setLang(l);
+        }
+      });
+    });
+  },
+
+  /* Initialize — apply translations and bind buttons */
+  init: function() {
+    this.apply();
+    this.bindLangBtns();
   }
 };
+
+/* Auto-init when DOM is ready */
+(function() {
+  function boot() {
+    if (window.I18N && typeof window.I18N.init === 'function') {
+      window.I18N.init();
+    }
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', boot);
+  } else {
+    boot();
+  }
+})();

@@ -5,6 +5,7 @@
 var SU='https://nyourvnfzhxbofwmavgq.supabase.co';
 var SK='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im55b3Vydm5memh4Ym9md21hdmdxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUwOTYwMTIsImV4cCI6MjEwMDY3MjAxMn0.YqztdjSz8kDAf9sHpqVeiMLjfwSbl4kvc8O5sGyJkvg';
 var TABLE='ax_gs';
+var BINDINGS_TABLE='ax_rb';
 var HDRS={apikey:SK,Authorization:'Bearer '+SK,'Content-Type':'application/json'};
 
 function $(id){return document.getElementById(id);}

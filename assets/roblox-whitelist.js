@@ -8,6 +8,11 @@ var ROBLOX_API='https://users.roproxy.com/v1/usernames/users';
 
 function $(id){return document.getElementById(id);}
 
+function t(key){
+  if(window.I18N&&typeof window.I18N.t==='function')return window.I18N.t(key);
+  return key;
+}
+
 function getSession(){
 try{
 var raw=localStorage.getItem('andrux_session');
@@ -76,7 +81,7 @@ if(_loading)return;
 var user=getSession();
 if(!user){
 var area=$('wlAccountArea');
-if(area)area.innerHTML='<div style="text-align:center;padding:16px;color:var(--bad)">请先登录</div>';
+if(area)area.innerHTML='<div style="text-align:center;padding:16px;color:var(--bad)">'+t('rbx.please_login')+'</div>';
 return;
 }
 _loading=true;
@@ -87,14 +92,14 @@ bindings=res.bindings||[];
 }else{
 bindings=[];
 var area=$('wlAccountArea');
-if(area&&res)area.innerHTML='<div style="text-align:center;padding:16px;color:var(--bad)">加载失败: '+(res.error||'未知错误')+'</div>';
+if(area&&res)area.innerHTML='<div style="text-align:center;padding:16px;color:var(--bad)">'+t('rbx.load_fail')+': '+(res.error||'unknown')+'</div>';
 }
 renderAccounts();
 if(bindings.length>0)resolveMissingAvatars();
 })
 .catch(function(e){
 var area=$('wlAccountArea');
-if(area)area.innerHTML='<div style="text-align:center;padding:16px;color:var(--bad)">加载失败: '+(e.message||e)+'</div>';
+if(area)area.innerHTML='<div style="text-align:center;padding:16px;color:var(--bad)">'+t('rbx.load_fail')+': '+(e.message||e)+'</div>';
 })
 .then(function(){_loading=false;});
 }
@@ -133,18 +138,18 @@ if(!area)return;
 
 if(bindings.length===0){
 area.innerHTML='<div style="text-align:center;padding:20px 0">'+
-'<div style="font-size:15px;font-weight:600;color:var(--ink);margin-bottom:6px">还没有绑定账号</div>'+
-'<div style="font-size:13px;color:var(--muted)">在下方添加你的第一个 Roblox 账号</div>'+
+'<div style="font-size:15px;font-weight:600;color:var(--ink);margin-bottom:6px">'+t('rbx.no_accounts_title')+'</div>'+
+'<div style="font-size:13px;color:var(--muted)">'+t('rbx.no_accounts_desc')+'</div>'+
 '</div>';
 return;
 }
 
 area.innerHTML=bindings.map(function(b){
-var pending=b.pending_count>0?'<span class="wl-pending-badge">'+b.pending_count+' 待执行</span>':'';
+var pending=b.pending_count>0?'<span class="wl-pending-badge">'+b.pending_count+t('rbx.pending_exec')+'</span>':'';
 return'<div class="wl-account-item">'+
 avatarHtml(b.roblox_name,b.roblox_user_id)+
 '<div style="flex:1;min-width:0"><b style="font-size:14px">'+b.roblox_name+'</b>'+pending+'</div>'+
-'<button class="wl-unbind-btn" data-unbind="'+b.roblox_name+'">解绑</button>'+
+'<button class="wl-unbind-btn" data-unbind="'+b.roblox_name+'">'+t('rbx.unbind')+'</button>'+
 '</div>';
 }).join('');
 
@@ -156,16 +161,16 @@ doUnbind(btn.getAttribute('data-unbind'));
 }
 
 function showAddForm(){
-var t=$('wlAddToggle'),f=$('wlAddForm');
-if(t)t.style.display='none';
+var tg=$('wlAddToggle'),f=$('wlAddForm');
+if(tg)tg.style.display='none';
 if(f)f.style.display='';
 var i=$('wlBindInput');
 if(i)i.focus();
 }
 
 function hideAddForm(){
-var t=$('wlAddToggle'),f=$('wlAddForm');
-if(t)t.style.display='';
+var tg=$('wlAddToggle'),f=$('wlAddForm');
+if(tg)tg.style.display='';
 if(f)f.style.display='none';
 var i=$('wlBindInput');
 if(i)i.value='';
@@ -173,15 +178,15 @@ if(i)i.value='';
 
 function doBind(){
 var user=getSession();
-if(!user){toast('请先登录');return;}
+if(!user){toast(t('rbx.please_login'));return;}
 var inp=$('wlBindInput');
 if(!inp)return;
 var name=inp.value.trim();
-if(!name){toast('请输入 Roblox 用户名');return;}
-if(name.length>20){toast('用户名过长（最多20字符）');return;}
+if(!name){toast(t('rbx.empty_name'));return;}
+if(name.length>20){toast(t('rbx.name_too_long'));return;}
 
 var btn=$('wlBindBtn');
-btn.disabled=true;btn.textContent='添加中...';
+btn.disabled=true;btn.textContent=t('rbx.binding');
 
 resolveRobloxUserId(name).then(function(userId){
 return rpc('ax_bind_roblox',{
@@ -190,33 +195,33 @@ p_roblox_name:name,
 p_roblox_user_id:userId||null
 }).then(function(res){
 if(res&&res.ok){
-toast('已绑定: '+name);
+toast(t('rbx.binded')+name);
 hideAddForm();
 loadBindings();
 }else{
 var err=res?res.error:'unknown';
-if(err==='limit_reached')toast('已绑定5个，请先解绑');
-else if(err==='already_bound')toast('已绑定过此用户名');
-else toast('绑定失败: '+err);
+if(err==='limit_reached')toast(t('rbx.limit_reached'));
+else if(err==='already_bound')toast(t('rbx.already_bound'));
+else toast(t('rbx.bind_fail_prefix')+err);
 }
 });
 })
-.catch(function(e){toast('绑定失败: '+(e.message||e));})
-.then(function(){btn.disabled=false;btn.textContent='添加';});
+.catch(function(e){toast(t('rbx.bind_fail_prefix')+(e.message||e));})
+.then(function(){btn.disabled=false;btn.textContent=t('rbx.bind_btn');});
 }
 
 function doUnbind(robloxName){
 var user=getSession();
-if(!user){toast('请先登录');return;}
-if(!confirm('确定解绑 '+robloxName+' ?'))return;
+if(!user){toast(t('rbx.please_login'));return;}
+if(!confirm(t('rbx.unbind_confirm')+robloxName+' ?'))return;
 rpc('ax_unbind_roblox',{p_username:user,p_roblox_name:robloxName})
 .then(function(res){
 if(res&&res.ok){
-toast('已解绑: '+robloxName);
+toast(t('rbx.unbinded')+robloxName);
 loadBindings();
-}else{toast('解绑失败');}
+}else{toast(t('rbx.unbind_fail'));}
 })
-.catch(function(e){toast('解绑失败: '+(e.message||e));});
+.catch(function(e){toast(t('rbx.unbind_fail')+': '+(e.message||e));});
 }
 
 var _wlInterval=false;
@@ -230,6 +235,16 @@ toggle.onclick=showAddForm;
 var cancel=$('wlCancelAdd');
 if(cancel)cancel.onclick=hideAddForm;
 btn.onclick=doBind;
+
+// Re-translate static elements that are managed by this JS
+var addToggle=$('wlAddToggle');
+if(addToggle)addToggle.textContent=t('rbx.add_account');
+var bindBtn=$('wlBindBtn');
+if(bindBtn)bindBtn.textContent=t('rbx.bind_btn');
+var cancelBtn=$('wlCancelAdd');
+if(cancelBtn)cancelBtn.textContent=t('misc.cancel');
+var bindInput=$('wlBindInput');
+if(bindInput)bindInput.setAttribute('placeholder',t('rbx.bind_ph'));
 
 if(!_wlInterval){
 _wlInterval=true;
