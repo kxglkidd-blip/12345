@@ -1,0 +1,102 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="referrer" content="no-referrer">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob: https:; connect-src https://*.supabase.co https://api.ipify.org; object-src 'none'; base-uri 'none'; frame-ancestors 'none'">
+<title>Andrux</title>
+<link rel="stylesheet" href="./assets/styles.css">
+</head>
+<body data-page="auth">
+<section id="authShell" class="auth-shell">
+<div class="auth-card">
+<div class="auth-story">
+<div class="brand-lockup">
+<div class="brand-mark">AX</div>
+<div>Andrux</div>
+</div>
+<h1 data-i18n="auth.headline">玩家控制台，干净而有秩序。</h1>
+<p data-i18n="auth.intro">登录或注册后才能进入仪表盘与社区。社区内置频率限制、重复内容限制、关键词内容拦截、消息撤回和专用右键菜单。</p>
+<div class="story-grid">
+<div class="story-tile"><b>3</b><span data-i18n="auth.story1">社区分区：普通聊天区、脚本区、Require 区</span></div>
+<div class="story-tile"><b>60s</b><span data-i18n="auth.story2">自己的消息在一分钟内可撤回，过时不可撤回</span></div>
+<div class="story-tile"><b>0</b><span data-i18n="auth.story3">界面不使用表情符号，风格更像真实产品</span></div>
+</div>
+</div>
+<div class="auth-panel">
+<div class="tabs" aria-label="Login / Register">
+<button class="tab-btn active" data-auth-tab="login" data-i18n="auth.login_tab">登录</button>
+<button class="tab-btn" data-auth-tab="register" data-i18n="auth.register_tab">注册</button>
+</div>
+<div id="humanGate" class="human-gate" aria-live="polite">
+<div class="human-gate-top">
+<div>
+<strong id="humanGateTitle" data-i18n="auth.human_title">安全检查</strong>
+<span id="humanGateText" data-i18n="auth.human_click_text">点击按钮完成验证</span>
+</div>
+<b id="humanGateState" data-i18n="auth.human_unverified">未验证</b>
+</div>
+<button id="humanHoldBtn" class="human-hold hidden" type="button">
+<span id="humanHoldLabel">按住验证</span>
+<i id="humanHoldBar"></i>
+</button>
+<div id="humanMathBox" class="human-mode hidden">
+<div id="humanMathQuestion" class="human-question">0 + 0 = ?</div>
+<div class="human-answer-row">
+<input id="humanMathAnswer" inputmode="numeric" autocomplete="off" placeholder="输入答案">
+<button id="humanMathBtn" class="ghost-btn" type="button">确认</button>
+</div>
+</div>
+<div id="humanSlideBox" class="human-mode hidden">
+<div class="human-question">把滑块拖到最右边</div>
+<div id="humanSlider" class="human-slider" role="button" tabindex="0" aria-label="拖动验证">
+<div id="humanSliderFill" class="human-slider-fill"></div>
+<div id="humanSliderThumb" class="human-slider-thumb">验证</div>
+<span id="humanSliderText">拖动完成验证</span>
+</div>
+</div>
+<button id="humanClickBtn" class="human-hold hidden" type="button">
+<span data-i18n="auth.human_click_btn">点击验证</span>
+<i></i>
+</button>
+<input id="humanTrap" class="human-trap" type="hidden" tabindex="-1" autocomplete="off">
+</div>
+<form id="loginForm" class="auth-form">
+<div class="field">
+<label for="loginName" data-i18n="auth.username">用户名</label>
+<input id="loginName" autocomplete="username" maxlength="24" placeholder="输入用户名" data-i18n-ph="auth.username_ph">
+</div>
+<div class="field">
+<label for="loginPass" data-i18n="auth.password">密码</label>
+<input id="loginPass" type="password" autocomplete="current-password" maxlength="64" placeholder="输入密码" data-i18n-ph="auth.password_ph">
+</div>
+<button class="primary-btn" type="submit" data-i18n="auth.enter_andrux">进入 Andrux</button>
+<div class="hint" data-i18n="auth.login_hint">不需要邮箱，也不需要验证码。用户名和密码会通过浏览器哈希后写入 Supabase。</div>
+<div id="loginNotice" class="notice" data-i18n="auth.login_notice">请先登录，未登录无法查看仪表盘和社区。</div>
+</form>
+<form id="registerForm" class="auth-form hidden">
+<div class="field">
+<label for="registerName" data-i18n="auth.username">用户名</label>
+<input id="registerName" autocomplete="username" maxlength="24" placeholder="3 到 24 位" data-i18n-ph="auth.register_name_ph">
+</div>
+<div class="field">
+<label for="registerPass" data-i18n="auth.password">密码</label>
+<input id="registerPass" type="password" autocomplete="new-password" maxlength="64" placeholder="至少 6 位" data-i18n-ph="auth.register_pass_ph">
+</div>
+<button class="primary-btn" type="submit" data-i18n="auth.create_account">创建账号</button>
+<div class="hint" data-i18n="auth.register_hint">用户名不能包含关键词、指定姓名、空格或表情符号。</div>
+<div id="registerNotice" class="notice" data-i18n="auth.register_notice">注册成功后会自动进入仪表盘。</div>
+</form>
+</div>
+</div>
+</section>
+<div id="toast" class="toast" data-i18n="misc.notice">提示</div>
+<script src="./assets/i18n.js?v=13"></script>
+<script src="./assets/polyfill.js?v=13"></script>
+<script src="./assets/page-app.js"></script>
+<script src="./assets/game-fix.js?v=12"></script>
+<script src="./assets/human-gate.js"></script>
+
+</body>
+</html>

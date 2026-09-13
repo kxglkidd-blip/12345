@@ -1,0 +1,108 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="referrer" content="no-referrer">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob: https:; connect-src https://*.supabase.co https://api.ipify.org; object-src 'none'; base-uri 'none'; frame-ancestors 'none'">
+<title>Andrux Community</title>
+<link rel="stylesheet" href="../assets/styles.css">
+</head>
+<body data-page="community">
+<section id="appShell" class="app-shell">
+<div class="mobile-bar">
+<button id="mobileMenu" class="menu-btn" aria-label="Menu" data-i18n="nav.menu">菜单</button>
+<strong>Andrux</strong>
+<button id="mobileLogout" class="ghost-btn" data-i18n="nav.exit">退出</button>
+</div>
+<aside id="sidebar" class="sidebar">
+<div class="side-head">
+<div class="brand-mark">AX</div>
+<div class="side-title">
+<strong>Andrux</strong>
+<small data-i18n="nav.player_center">玩家中心</small>
+</div>
+</div>
+<nav class="nav-group" aria-label="Pages">
+<button class="nav-btn" data-page="dashboard" data-href="./dashboard.html"><span data-i18n="nav.dashboard">仪表盘</span><span class="nav-code">01</span></button>
+<button class="nav-btn" data-page="game" data-href="./game.html"><span data-i18n="nav.game">游戏</span><span class="nav-code">02</span></button>
+<button class="nav-btn" data-page="executor" data-href="./executor.html"><span data-i18n="nav.executor">执行器</span><span class="nav-code">03</span></button>
+<button class="nav-btn active" data-page="community" data-href="./community.html"><span data-i18n="nav.community">社区</span><span class="nav-code">04</span></button>
+<button class="nav-btn" data-page="admin" data-href="./admin.html"><span data-i18n="nav.admin">管理员</span><span class="nav-code">05</span></button>
+<button class="nav-btn" data-page="profile" data-href="./profile.html"><span data-i18n="nav.profile">主页</span><span class="nav-code">06</span></button>
+<button class="nav-btn" data-page="settings" data-href="./settings.html"><span data-i18n="nav.settings">设置</span><span class="nav-code">07</span></button>
+<button class="nav-btn" data-page="roblox-whitelist" data-href="./roblox-whitelist.html"><span>Roblox 白名单</span><span class="nav-code">08</span></button>
+</nav>
+<div class="side-foot">
+<div class="user-card">
+<b id="sideUsername">Player</b>
+<span data-i18n="nav.logged_in">已登录，社区权限已开启</span>
+</div>
+<button id="logoutBtn" class="ghost-btn" data-i18n="nav.logout">退出登录</button>
+</div>
+</aside>
+<main class="content">
+<section id="communityPage" class="page active">
+<div class="page-header">
+<div>
+<span class="eyebrow" data-i18n="comm.eyebrow">社区</span>
+<h2 data-i18n="comm.title">玩家聊天区</h2>
+<p class="subtext" data-i18n="comm.desc">右键只在社区消息上生效，可撤回、引用、复制。脚本区支持 txt、lua，Require 区支持 txt、lua、rbxm、rbxl，文件发送同样限制刷屏。</p>
+</div>
+</div>
+<div class="community-shell">
+<div class="channels">
+<button class="channel-btn active" data-channel="general"><b data-i18n="comm.channel_general">普通聊天区</b><span data-i18n="comm.channel_general_desc">日常交流，限制刷屏</span></button>
+<button class="channel-btn" data-channel="scripts"><b data-i18n="comm.channel_scripts">脚本区</b><span data-i18n="comm.channel_scripts_desc">支持 txt、lua，禁止频繁发送</span></button>
+<button class="channel-btn" data-channel="require"><b data-i18n="comm.channel_require">Require 区</b><span data-i18n="comm.channel_require_desc">支持 txt、lua、rbxm、rbxl</span></button>
+</div>
+<div class="card chat-panel">
+<div class="chat-top">
+<div>
+<h3 id="channelTitle" data-i18n="comm.general_title">普通聊天区</h3>
+<p id="channelDesc" data-i18n="comm.general_desc">请保持聊天干净，禁止关键词内容和重复刷屏。</p>
+</div>
+<button class="ghost-btn" id="reloadChat" data-i18n="comm.reload">重新加载</button>
+</div>
+<div id="chatLog" class="chat-log"></div>
+<form id="messageForm" class="composer">
+<div id="quoteDraft" class="quote-draft">
+<span id="quoteText" data-i18n="comm.quote_content">引用内容</span>
+<button id="clearQuote" class="ghost-btn" type="button" data-i18n="comm.cancel_quote">取消引用</button>
+</div>
+<div class="compose-row">
+<div class="field">
+<textarea id="messageInput" maxlength="500" data-i18n-ph="comm.input_placeholder" placeholder="输入消息，最多 500 字"></textarea>
+</div>
+<button class="primary-btn" type="submit" id="sendBtn" data-i18n="comm.send">发送</button>
+</div>
+<div class="file-row">
+<label id="fileLabel" class="file-picker disabled">
+<span id="fileLabelText" data-i18n="comm.file_disabled">当前分区不支持文件</span>
+<input id="fileInput" type="file" disabled>
+</label>
+
+<span id="fileInfo" class="file-info" data-i18n="comm.file_none">未选择文件</span>
+</div>
+<div id="chatNotice" class="notice" data-i18n="comm.notice">提示：同一账号短时间内连续发送会被拦截。</div>
+</form>
+</div>
+</div>
+</section>
+</main>
+</section>
+<div id="contextMenu" class="context-menu">
+<button data-action="recall" data-i18n="comm.recall">撤回</button>
+<button data-action="quote" data-i18n="comm.quote">引用</button>
+<button data-action="copy" data-i18n="comm.copy">复制</button>
+</div>
+<div id="fileContextMenu" class="context-menu">
+<button data-file-action="remove" data-i18n="comm.file_remove">删除文件</button>
+</div>
+<div id="toast" class="toast" data-i18n="misc.notice">提示</div>
+<script src="../assets/i18n.js?v=13"></script>
+<script src="../assets/polyfill.js?v=13"></script>
+<script src="../assets/page-app.js"></script>
+<script src="../assets/game-fix.js?v=12"></script>
+</body>
+</html>
