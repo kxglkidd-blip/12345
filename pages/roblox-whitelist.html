@@ -11,43 +11,43 @@
 <body data-page="roblox-whitelist">
 <section id="appShell" class="app-shell">
 <div class="mobile-bar">
-<button id="mobileMenu" class="menu-btn" aria-label="Menu">菜单</button>
+<button id="mobileMenu" class="menu-btn" aria-label="Menu" data-i18n="nav.menu">菜单</button>
 <strong>Andrux</strong>
-<button id="mobileLogout" class="ghost-btn">退出</button>
+<button id="mobileLogout" class="ghost-btn" data-i18n="nav.exit">退出</button>
 </div>
 <aside id="sidebar" class="sidebar">
 <div class="side-head">
 <div class="brand-mark">AX</div>
 <div class="side-title">
 <strong>Andrux</strong>
-<small>玩家中心</small>
+<small data-i18n="nav.player_center">玩家中心</small>
 </div>
 </div>
 <nav class="nav-group" aria-label="Pages">
-<button class="nav-btn" data-page="dashboard" data-href="./dashboard.html"><span>仪表盘</span><span class="nav-code">01</span></button>
-<button class="nav-btn" data-page="game" data-href="./game.html"><span>游戏</span><span class="nav-code">02</span></button>
-<button class="nav-btn" data-page="executor" data-href="./executor.html"><span>执行器</span><span class="nav-code">03</span></button>
-<button class="nav-btn" data-page="community" data-href="./community.html"><span>社区</span><span class="nav-code">04</span></button>
-<button class="nav-btn" data-page="admin" data-href="./admin.html"><span>管理员</span><span class="nav-code">05</span></button>
-<button class="nav-btn" data-page="profile" data-href="./profile.html"><span>主页</span><span class="nav-code">06</span></button>
-<button class="nav-btn" data-page="settings" data-href="./settings.html"><span>设置</span><span class="nav-code">07</span></button>
-<button class="nav-btn active" data-page="roblox-whitelist" data-href="./roblox-whitelist.html"><span>Roblox 白名单</span><span class="nav-code">08</span></button>
+<button class="nav-btn" data-page="dashboard" data-href="./dashboard.html"><span data-i18n="nav.dashboard">仪表盘</span><span class="nav-code">01</span></button>
+<button class="nav-btn" data-page="game" data-href="./game.html"><span data-i18n="nav.game">游戏</span><span class="nav-code">02</span></button>
+<button class="nav-btn" data-page="executor" data-href="./executor.html"><span data-i18n="nav.executor">执行器</span><span class="nav-code">03</span></button>
+<button class="nav-btn" data-page="community" data-href="./community.html"><span data-i18n="nav.community">社区</span><span class="nav-code">04</span></button>
+<button class="nav-btn" data-page="admin" data-href="./admin.html"><span data-i18n="nav.admin">管理员</span><span class="nav-code">05</span></button>
+<button class="nav-btn" data-page="profile" data-href="./profile.html"><span data-i18n="nav.profile">主页</span><span class="nav-code">06</span></button>
+<button class="nav-btn" data-page="settings" data-href="./settings.html"><span data-i18n="nav.settings">设置</span><span class="nav-code">07</span></button>
+<button class="nav-btn active" data-page="roblox-whitelist" data-href="./roblox-whitelist.html"><span data-i18n="rbx.title">Roblox 白名单</span><span class="nav-code">08</span></button>
 </nav>
 <div class="side-foot">
 <div class="user-card">
 <b id="sideUsername">Player</b>
-<span>已登录</span>
+<span data-i18n="nav.logged_in">已登录，社区权限已开启</span>
 </div>
-<button id="logoutBtn" class="ghost-btn">退出登录</button>
+<button id="logoutBtn" class="ghost-btn" data-i18n="nav.logout">退出登录</button>
 </div>
 </aside>
 <main class="content">
 <section id="robloxWhitelistPage" class="page active">
 <div class="page-header">
 <div>
-<span class="eyebrow">Whitelist</span>
-<h2>Roblox 白名单</h2>
-<p class="subtext">绑定 Roblox 账号后，玩家进入任意运行本脚本的服务器将自动执行推送的脚本。最多绑定 5 个账号。</p>
+<span class="eyebrow" data-i18n="rbx.eyebrow">Roblox</span>
+<h2 data-i18n="rbx.title">Roblox 白名单</h2>
+<p class="subtext" data-i18n="rbx.desc">绑定你的 Roblox 用户名，获得执行器权限。绑定后加入游戏时自动获得执行器 UI。</p>
 </div>
 <span id="wlBindCount" class="wl-badge">0/5</span>
 </div>
@@ -69,27 +69,27 @@
 <div class="admin-card-head">
 <div>
 <span class="eyebrow">Accounts</span>
-<h3>已绑定账号</h3>
+<h3 data-i18n="rbx.current">已绑定账号</h3>
 </div>
 </div>
 <div id="wlAccountArea" style="margin:16px 0;min-height:60px"></div>
-<div id="wlAddToggle" class="wl-add-toggle">+ 添加账号</div>
+<div id="wlAddToggle" class="wl-add-toggle" data-i18n="rbx.add_account">+ 添加账号</div>
 <div id="wlAddForm" style="display:none;margin-top:12px">
-<input id="wlBindInput" type="text" autocomplete="off" placeholder="输入 Roblox 用户名" spellcheck="false" class="wl-input" style="margin-bottom:10px">
+<input id="wlBindInput" type="text" autocomplete="off" data-i18n-ph="rbx.bind_ph" placeholder="输入 Roblox 用户名" spellcheck="false" class="wl-input" style="margin-bottom:10px">
 <div style="display:flex;gap:8px;justify-content:flex-end">
-<button id="wlCancelAdd" class="ghost-btn" type="button">取消</button>
-<button id="wlBindBtn" class="primary-btn" type="button">添加</button>
+<button id="wlCancelAdd" class="ghost-btn" type="button" data-i18n="misc.cancel">取消</button>
+<button id="wlBindBtn" class="primary-btn" type="button" data-i18n="rbx.bind_btn">添加</button>
 </div>
 </div>
 </div>
 </section>
 </main>
 </section>
-<div id="toast" class="toast">提示</div>
-<script src="../assets/i18n.js?v=13"></script>
+<div id="toast" class="toast" data-i18n="misc.notice">提示</div>
+<script src="../assets/i18n.js?v=15"></script>
 <script src="../assets/polyfill.js?v=13"></script>
 <script src="../assets/page-app.js"></script>
 <script src="../assets/game-fix.js?v=12"></script>
-<script src="../assets/roblox-whitelist.js?v=4"></script>
+<script src="../assets/roblox-whitelist.js?v=5"></script>
 </body>
 </html>

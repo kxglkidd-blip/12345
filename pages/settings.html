@@ -85,6 +85,17 @@
 <option value="4000" data-i18n="set.refresh_fast">快速</option>
 </select>
 </div>
+<div class="card setting-card">
+<div>
+<span class="eyebrow" data-i18n="set.game_filter">游戏</span>
+<h3 data-i18n="set.hide_offline">不显示不在线游戏</h3>
+<p data-i18n="set.hide_offline_desc">开启后游戏页面只显示在线游戏，不在线的游戏会被隐藏。如果隐藏的游戏上线会自动显示，在线的游戏下线会自动隐藏。</p>
+</div>
+<label class="switch">
+<input id="settingHideOffline" type="checkbox">
+<span></span>
+</label>
+</div>
 <div class="card setting-card lang-card">
 <div>
 <span class="eyebrow" data-i18n="set.language">语言</span>
@@ -133,9 +144,10 @@
 <button data-file-action="remove" data-i18n="comm.file_remove">删除文件</button>
 </div>
 <div id="toast" class="toast" data-i18n="misc.notice">提示</div>
-<script src="../assets/i18n.js?v=13"></script>
+<script src="../assets/i18n.js?v=15"></script>
 <script src="../assets/polyfill.js?v=13"></script>
 <script src="../assets/page-app.js"></script>
-<script src="../assets/game-fix.js?v=12"></script>
+<script src="../assets/game-fix.js?v=13"></script>
+<script src="../assets/game-filter.js?v=2"></script>
 </body>
 </html>
