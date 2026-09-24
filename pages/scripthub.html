@@ -99,25 +99,44 @@
 </div>
 
 <div class="sh-tabs">
-<button class="sh-tab active" data-shtab="scripts" data-i18n="sh.tab_scripts">脚本库</button>
+<button class="sh-tab active" data-shtab="messages" data-i18n="sh.tab_messages">消息发送</button>
 <button class="sh-tab" data-shtab="actions" data-i18n="sh.tab_actions">玩家操作</button>
 </div>
 
-<div id="shScriptsPanel" class="sh-panel">
+<div id="shMessagesPanel" class="sh-panel">
 <div class="sh-section">
-<h3 data-i18n="sh.fun_title">趣味脚本</h3>
-<p class="sh-section-desc" data-i18n="sh.fun_desc">各种有趣的游戏内效果和特效</p>
-<div class="sh-grid" id="shGridFun"></div>
+<h3 data-i18n="sh.msg_title">发送消息</h3>
+<p class="sh-section-desc" data-i18n="sh.msg_desc">向目标玩家发送聊天消息或屏幕提示</p>
 </div>
-<div class="sh-section">
-<h3 data-i18n="sh.tools_title">工具脚本</h3>
-<p class="sh-section-desc" data-i18n="sh.tools_desc">实用的游戏内工具和构建辅助</p>
-<div class="sh-grid" id="shGridTools"></div>
+
+<div class="pa-panel" style="margin-top:16px">
+<div class="pa-group-title" data-i18n="sh.msg_chat">聊天消息 (Message)</div>
+<div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">
+<div style="flex:2;min-width:200px">
+<label data-i18n="sh.msg_content">消息内容</label>
+<input id="msgContent" type="text" placeholder="输入消息内容..." data-i18n-ph="sh.msg_ph" style="width:100%;padding:10px 14px;border:1px solid var(--rule);border-radius:10px;background:var(--bg);color:var(--ink);font-size:14px;margin-top:4px">
 </div>
-<div class="sh-section">
-<h3 data-i18n="sh.admin_title">管理脚本</h3>
-<p class="sh-section-desc" data-i18n="sh.admin_desc">服务器管理和玩家管理操作</p>
-<div class="sh-grid" id="shGridAdmin"></div>
+<div style="flex:1;min-width:120px">
+<label data-i18n="sh.msg_duration">持续时间 (秒)</label>
+<input id="msgDuration" type="number" value="5" min="0" placeholder="0=永久" data-i18n-ph="sh.dur_ph" style="width:100%;padding:10px 14px;border:1px solid var(--rule);border-radius:10px;background:var(--bg);color:var(--ink);font-size:14px;margin-top:4px">
+</div>
+<button class="pa-btn" style="padding:10px 24px" onclick="sendMessage()" data-i18n="sh.send_msg">发送消息</button>
+</div>
+</div>
+
+<div class="pa-panel" style="margin-top:16px">
+<div class="pa-group-title" data-i18n="sh.msg_hint">屏幕提示 (Hint)</div>
+<div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">
+<div style="flex:2;min-width:200px">
+<label data-i18n="sh.hint_content">提示内容</label>
+<input id="hintContent" type="text" placeholder="输入提示内容..." data-i18n-ph="sh.hint_ph" style="width:100%;padding:10px 14px;border:1px solid var(--rule);border-radius:10px;background:var(--bg);color:var(--ink);font-size:14px;margin-top:4px">
+</div>
+<div style="flex:1;min-width:120px">
+<label data-i18n="sh.hint_duration">持续时间 (秒)</label>
+<input id="hintDuration" type="number" value="3" min="0" placeholder="0=永久" data-i18n-ph="sh.dur_ph" style="width:100%;padding:10px 14px;border:1px solid var(--rule);border-radius:10px;background:var(--bg);color:var(--ink);font-size:14px;margin-top:4px">
+</div>
+<button class="pa-btn" style="padding:10px 24px" onclick="sendHint()" data-i18n="sh.send_hint">发送提示</button>
+</div>
 </div>
 </div>
 
@@ -131,9 +150,23 @@
 </div>
 
 <div class="pa-group-title" data-i18n="sh.char_actions">角色操作</div>
+<div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-bottom:10px">
+<div style="flex:1;min-width:140px">
+<label data-i18n="sh.act_speed">设置速度</label>
+<div style="display:flex;gap:6px;margin-top:4px">
+<input id="speedValue" type="number" value="16" min="1" style="flex:1;padding:8px 10px;border:1px solid var(--rule);border-radius:8px;background:var(--bg);color:var(--ink);font-size:13px">
+<button class="pa-btn" style="padding:8px 14px" onclick="paAction('speed')" data-i18n="sh.apply">应用</button>
+</div>
+</div>
+<div style="flex:1;min-width:140px">
+<label data-i18n="sh.act_jump">设置跳力</label>
+<div style="display:flex;gap:6px;margin-top:4px">
+<input id="jumpValue" type="number" value="50" min="1" style="flex:1;padding:8px 10px;border:1px solid var(--rule);border-radius:8px;background:var(--bg);color:var(--ink);font-size:13px">
+<button class="pa-btn" style="padding:8px 14px" onclick="paAction('jump')" data-i18n="sh.apply">应用</button>
+</div>
+</div>
+</div>
 <div class="pa-actions">
-<button class="pa-btn" onclick="paAction('speed')" data-i18n="sh.act_speed">设置速度</button>
-<button class="pa-btn" onclick="paAction('jump')" data-i18n="sh.act_jump">设置跳力</button>
 <button class="pa-btn" onclick="paAction('heal')" data-i18n="sh.act_heal">治疗</button>
 <button class="pa-btn" onclick="paAction('god')" data-i18n="sh.act_god">上帝模式</button>
 <button class="pa-btn" onclick="paAction('kill')" data-i18n="sh.act_kill">击杀</button>

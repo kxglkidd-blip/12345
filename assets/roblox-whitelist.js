@@ -66,11 +66,40 @@ return'https://www.roblox.com/headshot-thumbnail/image?userId='+userId+'&width=1
 
 function avatarHtml(name,userId){
 var url=getAvatarUrl(userId);
-var fallback='<div class="wl-avatar-fallback">'+name.charAt(0).toUpperCase()+'</div>';
+var initial=name.charAt(0).toUpperCase();
+var fallback='<div class="wl-avatar-fallback">'+initial+'</div>';
 if(url){
-return'<img src="'+url+'" class="wl-avatar" alt="'+name+'" onerror="this.outerHTML=\'<div class=&quot;wl-avatar-fallback&quot;>'+name.charAt(0).toUpperCase()+'</div>\'"/>';
+return'<img src="'+url+'" class="wl-avatar" alt="'+name+'" data-initial="'+initial+'" style="display:none"/>';
 }
 return fallback;
+}
+
+function setupAvatarImages(){
+var imgs=document.querySelectorAll('#wlAccountArea .wl-avatar');
+imgs.forEach(function(img){
+if(img._wlBound)return;
+img._wlBound=true;
+function showFallback(){
+var fb=document.createElement('div');
+fb.className='wl-avatar-fallback';
+fb.textContent=img.getAttribute('data-initial')||'?';
+if(img.parentNode)img.parentNode.replaceChild(fb,img);
+}
+img.addEventListener('load',function(){
+img.style.display='';
+});
+img.addEventListener('error',function(){
+showFallback();
+});
+// If image is already cached and loaded
+if(img.complete){
+if(img.naturalWidth>0){
+img.style.display='';
+}else{
+showFallback();
+}
+}
+});
 }
 
 var bindings=[];
@@ -158,6 +187,8 @@ btn.onclick=function(){
 doUnbind(btn.getAttribute('data-unbind'));
 };
 });
+
+setupAvatarImages();
 }
 
 function showAddForm(){
