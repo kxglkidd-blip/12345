@@ -141,6 +141,8 @@ window.I18N = {
       'sh.msg_title': '发送消息',
       'sh.msg_desc': '向目标玩家发送聊天消息或屏幕提示',
       'sh.msg_chat': '聊天消息 (Message)',
+      'sh.mode_world': '世界显示 (全服可见)',
+      'sh.mode_player': '特定玩家',
       'sh.msg_content': '消息内容',
       'sh.msg_ph': '输入消息内容...',
       'sh.msg_duration': '持续时间 (秒)',
@@ -595,6 +597,8 @@ window.I18N = {
       'sh.msg_title': 'Send Messages',
       'sh.msg_desc': 'Send chat messages or screen hints to target players',
       'sh.msg_chat': 'Chat Message',
+      'sh.mode_world': 'World (Everyone sees)',
+      'sh.mode_player': 'Specific player',
       'sh.msg_content': 'Message content',
       'sh.msg_ph': 'Enter message...',
       'sh.msg_duration': 'Duration (sec)',
@@ -1089,14 +1093,78 @@ window.I18N = {
 
 /* Auto-init when DOM is ready */
 (function() {
+  var _applied = false;
+  var _obs = null;
+
   function boot() {
     if (window.I18N && typeof window.I18N.init === 'function') {
       window.I18N.init();
+      _applied = true;
+      startObserver();
     }
   }
+
+  function startObserver() {
+    if (_obs || !window.I18N) return;
+    try {
+      _obs = new MutationObserver(function(mutations) {
+        var needsApply = false;
+        for (var i = 0; i < mutations.length; i++) {
+          var m = mutations[i];
+          if (m.addedNodes && m.addedNodes.length > 0) {
+            for (var j = 0; j < m.addedNodes.length; j++) {
+              var node = m.addedNodes[j];
+              if (node.nodeType === 1) { // Element
+                if (node.querySelector && (node.querySelector('[data-i18n]') || node.querySelector('[data-i18n-ph]'))) {
+                  needsApply = true;
+                  break;
+                }
+                if (node.getAttribute && (node.getAttribute('data-i18n') || node.getAttribute('data-i18n-ph'))) {
+                  needsApply = true;
+                  break;
+                }
+              }
+            }
+            if (needsApply) break;
+          }
+        }
+        if (needsApply) {
+          window.I18N.apply();
+          window.I18N.bindLangBtns();
+        }
+      });
+      _obs.observe(document.body, { childList: true, subtree: true });
+    } catch(e) {}
+  }
+
+  // Retry several times to catch late-rendered content
+  var retries = 0;
+  function retryApply() {
+    if (!window.I18N || retries > 5) return;
+    retries++;
+    if (typeof window.I18N.apply === 'function') {
+      window.I18N.apply();
+      window.I18N.bindLangBtns();
+    }
+    setTimeout(retryApply, retries * 500);
+  }
+
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', boot);
   } else {
     boot();
   }
+  setTimeout(retryApply, 300);
+
+  // Cross-tab language change listener
+  window.addEventListener('storage', function(e) {
+    if (e.key === 'andrux_lang' && window.I18N) {
+      var newLang = e.newValue || 'zh';
+      if (newLang !== window.I18N.lang) {
+        window.I18N.lang = newLang;
+        window.I18N.apply();
+        window.I18N.updateLangBtns();
+      }
+    }
+  });
 })();

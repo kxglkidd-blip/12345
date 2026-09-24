@@ -111,6 +111,20 @@
 
 <div class="pa-panel" style="margin-top:16px">
 <div class="pa-group-title" data-i18n="sh.msg_chat">聊天消息 (Message)</div>
+<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+<label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;color:var(--ink);font-weight:600">
+<input type="radio" name="msgMode" value="world" checked onchange="toggleMsgTarget('msg')">
+<span data-i18n="sh.mode_world">世界显示 (全服可见)</span>
+</label>
+<label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;color:var(--ink);font-weight:600">
+<input type="radio" name="msgMode" value="player" onchange="toggleMsgTarget('msg')">
+<span data-i18n="sh.mode_player">特定玩家</span>
+</label>
+</div>
+<div id="msgTargetRow" style="display:none;margin-bottom:12px">
+<label data-i18n="sh.target_player">目标玩家用户名</label>
+<input id="msgTargetUser" type="text" placeholder="输入玩家用户名" data-i18n-ph="sh.target_ph" style="width:100%;padding:10px 14px;border:1px solid var(--rule);border-radius:10px;background:var(--bg);color:var(--ink);font-size:14px;margin-top:4px">
+</div>
 <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">
 <div style="flex:2;min-width:200px">
 <label data-i18n="sh.msg_content">消息内容</label>
@@ -126,6 +140,20 @@
 
 <div class="pa-panel" style="margin-top:16px">
 <div class="pa-group-title" data-i18n="sh.msg_hint">屏幕提示 (Hint)</div>
+<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+<label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;color:var(--ink);font-weight:600">
+<input type="radio" name="hintMode" value="world" checked onchange="toggleMsgTarget('hint')">
+<span data-i18n="sh.mode_world">世界显示 (全服可见)</span>
+</label>
+<label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;color:var(--ink);font-weight:600">
+<input type="radio" name="hintMode" value="player" onchange="toggleMsgTarget('hint')">
+<span data-i18n="sh.mode_player">特定玩家</span>
+</label>
+</div>
+<div id="hintTargetRow" style="display:none;margin-bottom:12px">
+<label data-i18n="sh.target_player">目标玩家用户名</label>
+<input id="hintTargetUser" type="text" placeholder="输入玩家用户名" data-i18n-ph="sh.target_ph" style="width:100%;padding:10px 14px;border:1px solid var(--rule);border-radius:10px;background:var(--bg);color:var(--ink);font-size:14px;margin-top:4px">
+</div>
 <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">
 <div style="flex:2;min-width:200px">
 <label data-i18n="sh.hint_content">提示内容</label>

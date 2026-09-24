@@ -9,8 +9,29 @@ var ROBLOX_API='https://users.roproxy.com/v1/usernames/users';
 function $(id){return document.getElementById(id);}
 
 function t(key){
-  if(window.I18N&&typeof window.I18N.t==='function')return window.I18N.t(key);
+  if(window.I18N&&typeof window.I18N.t==='function'){
+    var v=window.I18N.t(key);
+    if(v&&v!==key)return v;
+  }
   return key;
+}
+
+/* ===== Self-contained i18n application ===== */
+function applyI18n(){
+  // Static data-i18n elements
+  var els=document.querySelectorAll('[data-i18n]');
+  for(var i=0;i<els.length;i++){
+    var key=els[i].getAttribute('data-i18n');
+    var val=t(key);
+    if(val&&val!==key){els[i].textContent=val;}
+  }
+  // data-i18n-ph placeholders
+  var phEls=document.querySelectorAll('[data-i18n-ph]');
+  for(var j=0;j<phEls.length;j++){
+    var pkey=phEls[j].getAttribute('data-i18n-ph');
+    var pval=t(pkey);
+    if(pval&&pval!==pkey){phEls[j].setAttribute('placeholder',pval);}
+  }
 }
 
 function getSession(){
@@ -267,6 +288,9 @@ var cancel=$('wlCancelAdd');
 if(cancel)cancel.onclick=hideAddForm;
 btn.onclick=doBind;
 
+// Apply i18n to all static and dynamic elements
+applyI18n();
+
 // Re-translate static elements that are managed by this JS
 var addToggle=$('wlAddToggle');
 if(addToggle)addToggle.textContent=t('rbx.add_account');
@@ -276,6 +300,9 @@ var cancelBtn=$('wlCancelAdd');
 if(cancelBtn)cancelBtn.textContent=t('misc.cancel');
 var bindInput=$('wlBindInput');
 if(bindInput)bindInput.setAttribute('placeholder',t('rbx.bind_ph'));
+
+// Re-render accounts with new language
+if(bindings.length>0)renderAccounts();
 
 if(!_wlInterval){
 _wlInterval=true;
@@ -287,8 +314,14 @@ setInterval(loadBindings,15000);
 if(document.readyState==='loading'){
 document.addEventListener('DOMContentLoaded',init);
 }else{init();}
-setTimeout(init,1000);
-setTimeout(init,3000);
+setTimeout(init,500);
+setTimeout(init,2000);
+setTimeout(init,4000);
+
+// Listen for language changes
+window.addEventListener('storage',function(e){
+if(e.key==='andrux_lang'){setTimeout(init,50);}
+});
 
 var _obs=new MutationObserver(function(){
 setTimeout(init,100);

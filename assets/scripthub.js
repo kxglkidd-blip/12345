@@ -118,43 +118,89 @@ function escapeLua(str){
   return str.replace(/\\/g,'\\\\').replace(/"/g,'\\"').replace(/\n/g,'\\n').replace(/\r/g,'\\r').replace(/\t/g,'\\t');
 }
 
+function getMsgMode(type){
+  var radios=document.querySelectorAll('input[name="'+type+'Mode"]');
+  for(var i=0;i<radios.length;i++){
+    if(radios[i].checked)return radios[i].value;
+  }
+  return 'world';
+}
+
+window.toggleMsgTarget=function(type){
+  var mode=getMsgMode(type);
+  var row=$(type+'TargetRow');
+  if(row){
+    row.style.display=(mode==='player')?'':'none';
+  }
+};
+
 window.sendMessage=function(){
   var placeId=getSelectedServer();
   if(!placeId){toast(tt('sh.select_server'));return;}
-  var targetUser=getTargetPlayer();
-  if(!targetUser){toast(tt('sh.enter_player'));return;}
+  var mode=getMsgMode('msg');
+  var targetUser='';
+  if(mode==='player'){
+    targetUser=($('msgTargetUser')?$('msgTargetUser').value:'').trim();
+    if(!targetUser){toast(tt('sh.enter_player'));return;}
+  }
   var content=($('msgContent')?$('msgContent').value:'').trim();
   if(!content){toast('请输入消息内容');return;}
   var duration=parseFloat($('msgDuration')?$('msgDuration').value:'5')||0;
-  var script='local target=game:GetService("Players"):FindFirstChild("'+escapeLua(targetUser)+'")\n'
-    +'if not target then return end\n'
-    +'local sg=target:FindFirstChild("PlayerGui") or target:WaitForChild("PlayerGui",5)\n'
-    +'if not sg then return end\n'
-    +'local m=Instance.new("Message")\n'
-    +'m.Text="'+escapeLua(content)+'"\n'
-    +'m.Parent=sg\n'
-    +(duration>0?'game:GetService("Debris"):AddItem(m,'+duration+')\n':'');
-  pushScript(script,'Message -> '+targetUser,'server');
+  var script;
+  var label;
+  if(mode==='world'){
+    script='local m=Instance.new("Message")\n'
+      +'m.Text="'+escapeLua(content)+'"\n'
+      +'m.Parent=workspace\n'
+      +(duration>0?'game:GetService("Debris"):AddItem(m,'+duration+')\n':'');
+    label='Message (World)';
+  }else{
+    script='local target=game:GetService("Players"):FindFirstChild("'+escapeLua(targetUser)+'")\n'
+      +'if not target then return end\n'
+      +'local sg=target:FindFirstChild("PlayerGui") or target:WaitForChild("PlayerGui",5)\n'
+      +'if not sg then return end\n'
+      +'local m=Instance.new("Message")\n'
+      +'m.Text="'+escapeLua(content)+'"\n'
+      +'m.Parent=sg\n'
+      +(duration>0?'game:GetService("Debris"):AddItem(m,'+duration+')\n':'');
+    label='Message -> '+targetUser;
+  }
+  pushScript(script,label,'server');
   if($('msgContent'))$('msgContent').value='';
 };
 
 window.sendHint=function(){
   var placeId=getSelectedServer();
   if(!placeId){toast(tt('sh.select_server'));return;}
-  var targetUser=getTargetPlayer();
-  if(!targetUser){toast(tt('sh.enter_player'));return;}
+  var mode=getMsgMode('hint');
+  var targetUser='';
+  if(mode==='player'){
+    targetUser=($('hintTargetUser')?$('hintTargetUser').value:'').trim();
+    if(!targetUser){toast(tt('sh.enter_player'));return;}
+  }
   var content=($('hintContent')?$('hintContent').value:'').trim();
   if(!content){toast('请输入提示内容');return;}
   var duration=parseFloat($('hintDuration')?$('hintDuration').value:'3')||0;
-  var script='local target=game:GetService("Players"):FindFirstChild("'+escapeLua(targetUser)+'")\n'
-    +'if not target then return end\n'
-    +'local sg=target:FindFirstChild("PlayerGui") or target:WaitForChild("PlayerGui",5)\n'
-    +'if not sg then return end\n'
-    +'local h=Instance.new("Hint")\n'
-    +'h.Text="'+escapeLua(content)+'"\n'
-    +'h.Parent=sg\n'
-    +(duration>0?'game:GetService("Debris"):AddItem(h,'+duration+')\n':'');
-  pushScript(script,'Hint -> '+targetUser,'server');
+  var script;
+  var label;
+  if(mode==='world'){
+    script='local h=Instance.new("Hint")\n'
+      +'h.Text="'+escapeLua(content)+'"\n'
+      +'h.Parent=workspace\n'
+      +(duration>0?'game:GetService("Debris"):AddItem(h,'+duration+')\n':'');
+    label='Hint (World)';
+  }else{
+    script='local target=game:GetService("Players"):FindFirstChild("'+escapeLua(targetUser)+'")\n'
+      +'if not target then return end\n'
+      +'local sg=target:FindFirstChild("PlayerGui") or target:WaitForChild("PlayerGui",5)\n'
+      +'if not sg then return end\n'
+      +'local h=Instance.new("Hint")\n'
+      +'h.Text="'+escapeLua(content)+'"\n'
+      +'h.Parent=sg\n'
+      +(duration>0?'game:GetService("Debris"):AddItem(h,'+duration+')\n':'');
+    label='Hint -> '+targetUser;
+  }
+  pushScript(script,label,'server');
   if($('hintContent'))$('hintContent').value='';
 };
 
