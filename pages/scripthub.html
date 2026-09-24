@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="referrer" content="no-referrer">
+<meta http-equiv="Content-Sonxiety-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob: https:; connect-src https://*.supabase.co https://api.ipify.org; object-src 'none'; base-uri 'none'; frame-ancestors 'none'">
+<title>Andrux Script Hub</title>
+<link rel="stylesheet" href="../assets/styles.css">
+<style>
+.sh-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px;margin-top:20px}
+.sh-card{background:var(--surface);border:1px solid var(--rule);border-radius:14px;padding:18px;transition:transform .2s,box-shadow .2s;cursor:pointer;position:relative;overflow:hidden}
+.sh-card:hover{transform:translateY(-3px);box-shadow:0 8px 24px rgba(0,0,0,.08)}
+.sh-card .sh-icon{font-size:28px;margin-bottom:10px;display:block}
+.sh-card h4{font-size:15px;font-weight:700;margin:0 0 6px;color:var(--ink)}
+.sh-card .sh-desc{font-size:12px;color:var(--muted);line-height:1.5;margin:0 0 12px}
+.sh-card .sh-badge{display:inline-block;font-size:10px;padding:2px 8px;border-radius:8px;background:var(--accent);color:#fff;margin-right:4px}
+.sh-card .sh-cat-fun{background:#6f4d2d}
+.sh-card .sh-cat-tool{background:#205a33}
+.sh-card .sh-cat-troll{background:#8a2d2d}
+.sh-card .sh-cat-admin{background:#3b5266}
+.sh-section{margin-top:30px}
+.sh-section h3{font-size:18px;font-weight:700;color:var(--ink);margin:0 0 4px}
+.sh-section .sh-section-desc{font-size:13px;color:var(--muted);margin:0 0 16px}
+.pa-panel{background:var(--surface);border:1px solid var(--rule);border-radius:14px;padding:20px;margin-top:16px}
+.pa-target-row{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-bottom:20px}
+.pa-target-row label{font-size:12px;color:var(--muted);display:block;margin-bottom:4px}
+.pa-target-row input{flex:1;min-width:200px;padding:10px 14px;border:1px solid var(--rule);border-radius:10px;background:var(--bg);color:var(--ink);font-size:14px}
+.pa-target-row select{padding:10px 14px;border:1px solid var(--rule);border-radius:10px;background:var(--bg);color:var(--ink);font-size:14px;min-width:200px}
+.pa-actions{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px}
+.pa-btn{padding:10px 8px;border:1px solid var(--rule);border-radius:10px;background:var(--bg2);color:var(--ink);font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;text-align:center}
+.pa-btn:hover{background:var(--accent);color:#fff;border-color:var(--accent);transform:translateY(-1px)}
+.pa-btn:active{transform:translateY(0)}
+.pa-btn.pa-danger:hover{background:var(--bad)}
+.pa-btn.pa-fun:hover{background:#6f4d2d}
+.pa-group-title{font-size:13px;font-weight:700;color:var(--ink);margin:18px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--rule)}
+.pa-group-title:first-child{margin-top:0}
+.sh-tabs{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap}
+.sh-tab{padding:8px 18px;border:1px solid var(--rule);border-radius:10px;background:var(--surface);color:var(--muted);font-size:13px;font-weight:600;cursor:pointer;transition:all .15s}
+.sh-tab.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.sh-tab:hover:not(.active){border-color:var(--accent);color:var(--ink)}
+.sh-server-select{display:flex;align-items:center;gap:10px;margin-bottom:20px;padding:14px 18px;background:var(--surface);border:1px solid var(--rule);border-radius:12px}
+.sh-server-select label{font-size:12px;color:var(--muted);white-space:nowrap}
+.sh-server-select select{flex:1;padding:8px 12px;border:1px solid var(--rule);border-radius:8px;background:var(--bg);color:var(--ink);font-size:13px}
+</style>
+</head>
+<body data-page="scripthub">
+<section id="appShell" class="app-shell">
+<div class="mobile-bar">
+<button id="mobileMenu" class="menu-btn" aria-label="Menu" data-i18n="nav.menu">菜单</button>
+<strong>Andrux</strong>
+<button id="mobileLogout" class="ghost-btn" data-i18n="nav.exit">退出</button>
+</div>
+<aside id="sidebar" class="sidebar">
+<div class="side-head">
+<div class="brand-mark">AX</div>
+<div class="side-title">
+<strong>Andrux</strong>
+<small data-i18n="nav.player_center">玩家中心</small>
+</div>
+</div>
+<nav class="nav-group" aria-label="Pages">
+<button class="nav-btn" data-page="dashboard" data-href="./dashboard.html"><span data-i18n="nav.dashboard">仪表盘</span><span class="nav-code">01</span></button>
+<button class="nav-btn" data-page="game" data-href="./game.html"><span data-i18n="nav.game">游戏</span><span class="nav-code">02</span></button>
+<button class="nav-btn" data-page="executor" data-href="./executor.html"><span data-i18n="nav.executor">执行器</span><span class="nav-code">03</span></button>
+<button class="nav-btn active" data-page="scripthub" data-href="./scripthub.html"><span data-i18n="nav.scripthub">脚本中心</span><span class="nav-code">04</span></button>
+<button class="nav-btn" data-page="community" data-href="./community.html"><span data-i18n="nav.community">社区</span><span class="nav-code">05</span></button>
+<button class="nav-btn" data-page="admin" data-href="./admin.html"><span data-i18n="nav.admin">管理员</span><span class="nav-code">06</span></button>
+<button class="nav-btn" data-page="profile" data-href="./profile.html"><span data-i18n="nav.profile">主页</span><span class="nav-code">07</span></button>
+<button class="nav-btn" data-page="settings" data-href="./settings.html"><span data-i18n="nav.settings">设置</span><span class="nav-code">08</span></button>
+<button class="nav-btn" data-page="roblox-whitelist" data-href="./roblox-whitelist.html"><span>Roblox 白名单</span><span class="nav-code">09</span></button>
+</nav>
+<div class="side-foot">
+<div class="user-card">
+<b id="sideUsername">Player</b>
+<span data-i18n="nav.logged_in">已登录，社区权限已开启</span>
+</div>
+<button id="logoutBtn" class="ghost-btn" data-i18n="nav.logout">退出登录</button>
+</div>
+</aside>
+<main class="content">
+<section id="scripthubPage" class="page active">
+<div class="page-header">
+<div>
+<span class="eyebrow" data-i18n="sh.eyebrow">Script Hub</span>
+<h2 data-i18n="sh.title">脚本中心</h2>
+<p class="subtext" data-i18n="sh.desc">预制脚本库和玩家操作面板，一键推送到游戏服务器。</p>
+</div>
+</div>
+
+<div class="sh-server-select">
+<label data-i18n="sh.target_server">目标服务器：</label>
+<select id="shServerSelect"><option data-i18n="sh.loading">加载中...</option></select>
+</div>
+
+<div class="sh-server-select">
+<label data-i18n="sh.target_player">目标玩家：</label>
+<input id="shTargetPlayer" type="text" placeholder="输入玩家用户名" data-i18n-ph="sh.target_ph" style="flex:1;padding:8px 12px;border:1px solid var(--rule);border-radius:8px;background:var(--bg);color:var(--ink);font-size:13px">
+</div>
+
+<div class="sh-tabs">
+<button class="sh-tab active" data-shtab="scripts" data-i18n="sh.tab_scripts">脚本库</button>
+<button class="sh-tab" data-shtab="actions" data-i18n="sh.tab_actions">玩家操作</button>
+</div>
+
+<div id="shScriptsPanel" class="sh-panel">
+<div class="sh-section">
+<h3 data-i18n="sh.fun_title">趣味脚本</h3>
+<p class="sh-section-desc" data-i18n="sh.fun_desc">各种有趣的游戏内效果和特效</p>
+<div class="sh-grid" id="shGridFun"></div>
+</div>
+<div class="sh-section">
+<h3 data-i18n="sh.tools_title">工具脚本</h3>
+<p class="sh-section-desc" data-i18n="sh.tools_desc">实用的游戏内工具和构建辅助</p>
+<div class="sh-grid" id="shGridTools"></div>
+</div>
+<div class="sh-section">
+<h3 data-i18n="sh.admin_title">管理脚本</h3>
+<p class="sh-section-desc" data-i18n="sh.admin_desc">服务器管理和玩家管理操作</p>
+<div class="sh-grid" id="shGridAdmin"></div>
+</div>
+</div>
+
+<div id="shActionsPanel" class="sh-panel" style="display:none">
+<div class="pa-panel">
+<div class="pa-target-row">
+<div style="flex:1">
+<label data-i18n="sh.target_player">目标玩家用户名</label>
+<input id="paTargetUser" type="text" placeholder="PlayerName" data-i18n-ph="sh.target_ph">
+</div>
+</div>
+
+<div class="pa-group-title" data-i18n="sh.char_actions">角色操作</div>
+<div class="pa-actions">
+<button class="pa-btn" onclick="paAction('speed')" data-i18n="sh.act_speed">设置速度</button>
+<button class="pa-btn" onclick="paAction('jump')" data-i18n="sh.act_jump">设置跳力</button>
+<button class="pa-btn" onclick="paAction('heal')" data-i18n="sh.act_heal">治疗</button>
+<button class="pa-btn" onclick="paAction('god')" data-i18n="sh.act_god">上帝模式</button>
+<button class="pa-btn" onclick="paAction('kill')" data-i18n="sh.act_kill">击杀</button>
+<button class="pa-btn" onclick="paAction('freeze')" data-i18n="sh.act_freeze">冰冻</button>
+<button class="pa-btn" onclick="paAction('thaw')" data-i18n="sh.act_thaw">解冻</button>
+</div>
+
+<div class="pa-group-title" data-i18n="sh.fun_actions">趣味操作</div>
+<div class="pa-actions">
+<button class="pa-btn pa-fun" onclick="paAction('explode')" data-i18n="sh.act_explode">爆炸</button>
+<button class="pa-btn pa-fun" onclick="paAction('fire')" data-i18n="sh.act_fire">着火</button>
+<button class="pa-btn pa-fun" onclick="paAction('smoke')" data-i18n="sh.act_smoke">冒烟</button>
+<button class="pa-btn pa-fun" onclick="paAction('sparkles')" data-i18n="sh.act_sparkles">闪光</button>
+<button class="pa-btn pa-fun" onclick="paAction('forcefield')" data-i18n="sh.act_forcefield">护盾</button>
+<button class="pa-btn pa-fun" onclick="paAction('sit')" data-i18n="sh.act_sit">坐下</button>
+<button class="pa-btn pa-fun" onclick="paAction('fling')" data-i18n="sh.act_fling">弹飞</button>
+<button class="pa-btn pa-fun" onclick="paAction('invisible')" data-i18n="sh.act_invisible">隐身</button>
+<button class="pa-btn pa-fun" onclick="paAction('visible')" data-i18n="sh.act_visible">恢复</button>
+</div>
+
+<div class="pa-group-title" data-i18n="sh.essential_actions">基本操作</div>
+<div class="pa-actions">
+<button class="pa-btn pa-danger" onclick="paAction('kick')" data-i18n="sh.act_kick">踢出</button>
+<button class="pa-btn pa-danger" onclick="paAction('punish')" data-i18n="sh.act_punish">惩罚</button>
+<button class="pa-btn" onclick="paAction('refresh')" data-i18n="sh.act_refresh">刷新</button>
+<button class="pa-btn" onclick="paAction('goto')" data-i18n="sh.act_goto">传送到</button>
+<button class="pa-btn" onclick="paAction('bring')" data-i18n="sh.act_bring">拉过来</button>
+</div>
+
+<div class="pa-group-title" data-i18n="sh.tool_actions">工具操作</div>
+<div class="pa-actions">
+<button class="pa-btn" onclick="paAction('f3x')" data-i18n="sh.act_f3x">F3X 构建</button>
+<button class="pa-btn" onclick="paAction('luger')" data-i18n="sh.act_luger">手枪</button>
+<button class="pa-btn" onclick="paAction('tripmine')" data-i18n="sh.act_tripmine">地雷</button>
+</div>
+</div>
+</div>
+
+</section>
+</main>
+</section>
+<div id="toast" class="toast" data-i18n="misc.notice">提示</div>
+<script src="../assets/i18n.js?v=16"></script>
+<script src="../assets/polyfill.js?v=13"></script>
+<script src="../assets/page-app.js"></script>
+<script src="../assets/scripthub.js?v=1"></script>
+</body>
+</html>
