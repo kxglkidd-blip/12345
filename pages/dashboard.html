@@ -7,6 +7,41 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob: https:; connect-src https://*.supabase.co https://api.ipify.org; object-src 'none'; base-uri 'none'; frame-ancestors 'none'">
 <title>Andrux Dashboard</title>
 <link rel="stylesheet" href="../assets/styles.css">
+<style>
+.dash-grid{display:grid;grid-template-columns:1fr 340px;gap:16px;margin-top:20px}
+.dash-col-left{display:flex;flex-direction:column;gap:16px}
+.dash-col-right{display:flex;flex-direction:column;gap:16px}
+.dash-card{background:var(--surface);border:1px solid var(--rule);border-radius:14px;padding:18px}
+.dash-card .dash-card-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.dash-card .dash-card-head h3{font-size:15px;font-weight:700;color:var(--ink);margin:0}
+.dash-card .dash-card-head .eyebrow{font-size:11px}
+.dash-list{display:flex;flex-direction:column;gap:10px;max-height:380px;overflow-y:auto;padding-right:4px}
+.dash-list::-webkit-scrollbar{width:5px}
+.dash-list::-webkit-scrollbar-track{background:transparent}
+.dash-list::-webkit-scrollbar-thumb{background:rgba(0,0,0,.15);border-radius:3px}
+.dash-item{display:flex;align-items:center;gap:12px;padding:10px 12px;background:var(--bg);border-radius:10px;border:1px solid var(--rule)}
+.dash-item-icon{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0}
+.dash-item-icon.add{background:rgba(32,90,51,.15);color:#2d7a3f}
+.dash-item-icon.remove{background:rgba(138,45,45,.15);color:#b03a3a}
+.dash-item-icon.login{background:rgba(59,82,102,.15);color:#3b5266}
+.dash-item-icon.logout{background:rgba(138,45,45,.1);color:#8a5a2d}
+.dash-item-body{flex:1;min-width:0}
+.dash-item-body b{font-size:13px;color:var(--ink);font-weight:600;display:block;margin-bottom:2px}
+.dash-item-body span{font-size:11px;color:var(--muted)}
+.dash-item-time{font-size:11px;color:var(--muted);flex-shrink:0}
+.dash-game-item{display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--bg);border-radius:10px;border:1px solid var(--rule);margin-bottom:8px}
+.dash-game-item:last-child{margin-bottom:0}
+.dash-game-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;background:#bbb}
+.dash-game-dot.online{background:#2d7a3f;box-shadow:0 0 6px rgba(45,122,63,.5)}
+.dash-game-name{flex:1;font-size:13px;font-weight:600;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dash-game-count{font-size:12px;color:var(--muted);flex-shrink:0}
+.dash-empty{text-align:center;padding:30px 10px;color:var(--muted);font-size:13px}
+.dash-bottom-row{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:900px){
+  .dash-grid{grid-template-columns:1fr}
+  .dash-bottom-row{grid-template-columns:1fr}
+}
+</style>
 </head>
 <body data-page="dashboard">
 <section id="appShell" class="app-shell">
@@ -25,14 +60,14 @@
 </div>
 <nav class="nav-group" aria-label="Pages">
 <button class="nav-btn active" data-page="dashboard" data-href="./dashboard.html"><span data-i18n="nav.dashboard">仪表盘</span><span class="nav-code">01</span></button>
-<button class="nav-btn" data-page="game" data-href="./game.html"><span data-i18n="nav.game">游戏</span><span class="nav-code">01</span></button>
-<button class="nav-btn" data-page="executor" data-href="./executor.html"><span data-i18n="nav.executor">执行器</span><span class="nav-code">02</span></button>
-<button class="nav-btn" data-page="scripthub" data-href="./scripthub.html"><span data-i18n="nav.scripthub">脚本中心</span><span class="nav-code">03</span></button>
-<button class="nav-btn" data-page="community" data-href="./community.html"><span data-i18n="nav.community">社区</span><span class="nav-code">04</span></button>
-<button class="nav-btn" data-page="admin" data-href="./admin.html"><span data-i18n="nav.admin">管理员</span><span class="nav-code">05</span></button>
-<button class="nav-btn" data-page="profile" data-href="./profile.html"><span data-i18n="nav.profile">主页</span><span class="nav-code">06</span></button>
-<button class="nav-btn" data-page="settings" data-href="./settings.html"><span data-i18n="nav.settings">设置</span><span class="nav-code">07</span></button>
-<button class="nav-btn" data-page="roblox-whitelist" data-href="./roblox-whitelist.html"><span>Roblox 白名单</span><span class="nav-code">08</span></button>
+<button class="nav-btn" data-page="game" data-href="./game.html"><span data-i18n="nav.game">游戏</span><span class="nav-code">02</span></button>
+<button class="nav-btn" data-page="executor" data-href="./executor.html"><span data-i18n="nav.executor">执行器</span><span class="nav-code">03</span></button>
+<button class="nav-btn" data-page="scripthub" data-href="./scripthub.html"><span data-i18n="nav.scripthub">脚本中心</span><span class="nav-code">04</span></button>
+<button class="nav-btn" data-page="community" data-href="./community.html"><span data-i18n="nav.community">社区</span><span class="nav-code">05</span></button>
+<button class="nav-btn" data-page="admin" data-href="./admin.html"><span data-i18n="nav.admin">管理员</span><span class="nav-code">06</span></button>
+<button class="nav-btn" data-page="profile" data-href="./profile.html"><span data-i18n="nav.profile">主页</span><span class="nav-code">07</span></button>
+<button class="nav-btn" data-page="settings" data-href="./settings.html"><span data-i18n="nav.settings">设置</span><span class="nav-code">08</span></button>
+<button class="nav-btn" data-page="roblox-whitelist" data-href="./roblox-whitelist.html"><span>Roblox 白名单</span><span class="nav-code">09</span></button>
 </nav>
 <div class="side-foot">
 <div class="user-card">
@@ -47,38 +82,65 @@
 <div class="page-header">
 <div>
 <span class="eyebrow" data-i18n="dash.eyebrow">控制台</span>
-<h2 data-i18n="dash.title">Andrux 仪表盘</h2>
-<p class="subtext" data-i18n="dash.desc">这里是登录后的主页面，用来展示玩家状态、社区安全策略和当前系统保护。页面只在登录或注册后开放。</p>
+<h2 data-i18n="dash.title">仪表盘</h2>
 </div>
 </div>
-<div class="grid metrics">
-<div class="card metric"><b id="metricUsers">0</b><span data-i18n="dash.online_users">在线用户</span></div>
-<div class="card metric"><b id="metricMessages">0</b><span data-i18n="dash.community_msgs">社区消息</span></div>
-<div class="card metric"><b>3</b><span data-i18n="dash.chat_channels">聊天分区</span></div>
-<div class="card metric"><b>60</b><span data-i18n="dash.recall_window">秒内可撤回</span></div>
+
+<div class="dash-grid">
+<!-- 左边：白名单更改 + 最近登录 -->
+<div class="dash-col-left">
+<!-- 最近白名单更改 -->
+<div class="dash-card">
+<div class="dash-card-head">
+<div>
+<span class="eyebrow" data-i18n="dash.whitelist_eyebrow">Whitelist</span>
+<h3 data-i18n="dash.whitelist_title">最近白名单更改</h3>
 </div>
-<div class="dashboard-layout">
-<div class="card">
-<span class="eyebrow" data-i18n="dash.sys_status">系统状态</span>
-<h3 data-i18n="dash.access_open">访问已开启</h3>
-<p class="subtext" data-i18n="dash.access_desc">你已进入 Andrux 玩家中心，可以查看仪表盘并进入社区页面。未登录用户只会看到登录和注册入口。</p>
+</div>
+<div id="dashWhitelistList" class="dash-list">
+<div class="dash-empty" data-i18n="dash.loading">加载中...</div>
 </div>
 </div>
+
+<!-- 最近登录状态 -->
+<div class="dash-card">
+<div class="dash-card-head">
+<div>
+<span class="eyebrow" data-i18n="dash.login_eyebrow">Activity</span>
+<h3 data-i18n="dash.login_title">最近登录状态</h3>
+</div>
+</div>
+<div id="dashLoginList" class="dash-list">
+<div class="dash-empty" data-i18n="dash.loading">加载中...</div>
+</div>
+</div>
+</div>
+
+<!-- 右边：游戏状态 -->
+<div class="dash-col-right">
+<div class="dash-card">
+<div class="dash-card-head">
+<div>
+<span class="eyebrow" data-i18n="dash.game_eyebrow">Game</span>
+<h3 data-i18n="dash.game_title">当前游戏状态</h3>
+</div>
+</div>
+<div id="dashGameList">
+<div class="dash-empty" data-i18n="dash.loading">加载中...</div>
+</div>
+</div>
+</div>
+</div>
+
 </section>
 </main>
 </section>
-<div id="contextMenu" class="context-menu">
-<button data-action="recall" data-i18n="comm.recall">撤回</button>
-<button data-action="quote" data-i18n="comm.quote">引用</button>
-<button data-action="copy" data-i18n="comm.copy">复制</button>
-</div>
-<div id="fileContextMenu" class="context-menu">
-<button data-file-action="remove" data-i18n="comm.file_remove">删除文件</button>
-</div>
 <div id="toast" class="toast" data-i18n="misc.notice">提示</div>
 <script src="../assets/i18n.js?v=16"></script>
 <script src="../assets/polyfill.js?v=13"></script>
+<script src="../assets/game-filter.js?v=4"></script>
 <script src="../assets/page-app.js"></script>
 <script src="../assets/game-fix.js?v=12"></script>
+<script src="../assets/dashboard.js"></script>
 </body>
 </html>

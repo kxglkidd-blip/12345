@@ -45,6 +45,10 @@ body:JSON.stringify(body)
 }
 
 /* ===== Server select ===== */
+function hideOffline(){
+  try{return localStorage.getItem('andrux_hide_offline')==='1';}catch(e){return false;}
+}
+
 function loadServers(){
 var sel=$('shServerSelect');
 if(!sel)return;
@@ -54,15 +58,20 @@ if(!rows||!rows.length){
 sel.innerHTML='<option value="">'+tt('sh.no_servers')+'</option>';
 return;
 }
-var online=rows.filter(function(r){return r.status==='online';});
-if(!online.length){
-sel.innerHTML='<option value="">'+tt('sh.no_online')+'</option>';
+var hideOff=hideOffline();
+var filtered=rows.filter(function(r){
+  if(hideOff&&r.status!=='online')return false;
+  return true;
+});
+if(!filtered.length){
+sel.innerHTML='<option value="">'+(hideOff?tt('sh.no_online'):tt('sh.no_servers'))+'</option>';
 return;
 }
-sel.innerHTML=online.map(function(r){
+sel.innerHTML=filtered.map(function(r){
 var name=r.game_name||r.place_id;
-var pc=r.player_count||0;
-return'<option value="'+r.place_id+'">'+name+' ('+pc+')</option>';
+var pc=(r.status==='online')?(r.player_count||0):0;
+var statusTag=(r.status==='online')?'':' ['+(tt('sh.offline')||'离线')+']';
+return'<option value="'+r.place_id+'"'+(r.status==='online'?'':' data-offline="1"')+'>'+name+statusTag+' ('+pc+')</option>';
 }).join('');
 })
 .catch(function(){sel.innerHTML='<option value="">'+tt('sh.load_fail')+'</option>';});
@@ -295,4 +304,13 @@ init();
 setTimeout(init,300);
 setTimeout(init,1000);
 setTimeout(init,3000);
+
+/* Refresh server list when hide-offline setting changes */
+window.addEventListener('storage',function(e){
+  if(e.key==='andrux_hide_offline'){loadServers();}
+  if(e.key==='andrux_lang'){setTimeout(applyI18n,50);loadServers();}
+});
+window.addEventListener('andrux_hide_offline_change',function(){loadServers();});
+
+window.AxScriptHub={reload:loadServers};
 })();

@@ -1,4 +1,4 @@
-/* Andrux Game Filter — hide offline games based on settings toggle */
+/* Andrux Game Filter — hide offline games across all pages */
 (function(){
 'use strict';
 
@@ -13,12 +13,12 @@ function tt(k){
     zh:{
       'set.game_filter':'游戏',
       'set.hide_offline':'不显示不在线游戏',
-      'set.hide_offline_desc':'开启后游戏页面只显示在线游戏，不在线的游戏会被隐藏。如果隐藏的游戏上线会自动显示，在线的游戏下线会自动隐藏。'
+      'set.hide_offline_desc':'开启后所有页面只显示在线游戏，不在线的游戏会被隐藏。如果隐藏的游戏上线会自动显示，在线的游戏下线会自动隐藏。'
     },
     en:{
       'set.game_filter':'Games',
       'set.hide_offline':'Hide offline games',
-      'set.hide_offline_desc':'When enabled, the game page only shows online games. Offline games are hidden. If a hidden game comes online, it appears automatically. If an online game goes offline, it is hidden.'
+      'set.hide_offline_desc':'When enabled, all pages only show online games. Offline games are hidden. If a hidden game comes online, it appears automatically. If an online game goes offline, it is hidden.'
     }
   };
   var lang='zh';
@@ -32,6 +32,14 @@ function isHideOffline(){
 
 function setHideOffline(val){
   try{localStorage.setItem(STORAGE_KEY,val?'1':'0');}catch(e){}
+}
+
+/* Broadcast to other scripts on the same page */
+function broadcastChange(){
+  try{
+    var evt=new CustomEvent('andrux_hide_offline_change',{detail:{hide:isHideOffline()}});
+    window.dispatchEvent(evt);
+  }catch(e){}
 }
 
 /* ===== Settings page: create and manage toggle ===== */
@@ -80,7 +88,8 @@ function ensureSettingsCard(){
   input.checked=isHideOffline();
   input.addEventListener('change',function(){
     setHideOffline(input.checked);
-    refreshFilter();
+    refreshAllFilters();
+    broadcastChange();
   });
 
   return input;
@@ -98,65 +107,96 @@ function fixSettingsToggle(){
   }
 }
 
-/* ===== Game page: filter offline cards ===== */
-function applyGameFilter(){
-  if(!isHideOffline())return;
-  var box=document.getElementById('gameStatusBox');
+/* ===== Network-level filter: ask the API for online games only =====
+   Works no matter which script renders the list (page-app, scripthub, exec-asset). */
+function installFetchFilter(){
+  if(window.__axFetchPatched)return;
+  window.__axFetchPatched=true;
+  var orig=window.fetch;
+  if(typeof orig!=='function')return;
+  window.fetch=function(input,init){
+    try{
+      if(typeof input==='string'&&isHideOffline()){
+        var method=(init&&init.method)?String(init.method).toUpperCase():'GET';
+        if(method==='GET'
+          &&input.indexOf('/rest/v1/ax_gs')>=0
+          &&input.indexOf('select=')>=0
+          &&input.indexOf('exec_queue')<0
+          &&input.indexOf('status=')<0){
+          input=input+(input.indexOf('?')>=0?'&':'?')+'status=eq.online';
+        }
+      }
+    }catch(e){}
+    return orig.call(this,input,init);
+  };
+}
+
+/* ===== Filter: card-based game lists (game page, executor Lua mode) ===== */
+function filterCardContainer(containerId,selector){
+  var box=document.getElementById(containerId);
   if(!box)return;
-  var offlineCards=box.querySelectorAll('.gc-offline');
-  for(var i=0;i<offlineCards.length;i++){
-    offlineCards[i].style.display='none';
+  var hide=isHideOffline();
+  var items=box.querySelectorAll(selector);
+  for(var i=0;i<items.length;i++){
+    items[i].style.display=hide?'none':'';
   }
 }
 
-function restoreAllCards(){
-  var box=document.getElementById('gameStatusBox');
-  if(!box)return;
-  var hidden=box.querySelectorAll('.gc-offline');
-  for(var i=0;i<hidden.length;i++){
-    hidden[i].style.display='';
-  }
+function refreshCardFilters(){
+  filterCardContainer('gameStatusBox','.gc-offline');
+  filterCardContainer('execGameList','.exec-game-item.offline');
 }
 
-function refreshFilter(){
-  if(isHideOffline()){
-    applyGameFilter();
-  }else{
-    restoreAllCards();
-  }
+/* Ask page scripts to re-render their server lists */
+function reloadLists(){
+  try{if(window.AxScriptHub&&window.AxScriptHub.reload)window.AxScriptHub.reload();}catch(e){}
+  try{if(window.AxExecAsset&&window.AxExecAsset.reload)window.AxExecAsset.reload();}catch(e){}
 }
 
-/* MutationObserver on game page */
+/* ===== Full refresh ===== */
+function refreshAllFilters(){
+  fixSettingsToggle();
+  refreshCardFilters();
+  reloadLists();
+  broadcastChange();
+}
+
+/* MutationObserver — watch for any game list content changes */
 var _filterTimer=null;
 var _gameObs=new MutationObserver(function(){
   if(_filterTimer)clearTimeout(_filterTimer);
   _filterTimer=setTimeout(function(){
     fixSettingsToggle();
-    refreshFilter();
+    refreshCardFilters();
   },100);
 });
 
 function startObserver(){
-  var box=document.getElementById('gameStatusBox');
-  if(box){
-    _gameObs.observe(box,{childList:true,subtree:true,attributes:true,attributeFilter:['class']});
-  }
-  _gameObs.observe(document.body,{childList:true,subtree:true});
+  _gameObs.observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['class']});
 }
 
+/* Listen for storage changes (cross-tab) */
 window.addEventListener('storage',function(e){
   if(e.key===STORAGE_KEY){
-    fixSettingsToggle();
-    refreshFilter();
+    refreshAllFilters();
   }
 });
 
+/* Also listen for same-page toggle via custom event from other scripts */
+window.addEventListener('andrux_hide_offline_change',function(){
+  refreshCardFilters();
+  fixSettingsToggle();
+});
+
 function init(){
+  installFetchFilter();
   ensureSettingsCard();
   fixSettingsToggle();
-  refreshFilter();
+  refreshCardFilters();
   startObserver();
 }
+
+installFetchFilter();
 
 if(document.readyState==='loading'){
   document.addEventListener('DOMContentLoaded',init);
@@ -168,4 +208,10 @@ setTimeout(init,800);
 setTimeout(init,1500);
 setTimeout(init,3000);
 setTimeout(init,5000);
+
+/* Expose API */
+window.GameFilter={
+  isHidden:isHideOffline,
+  refresh:refreshAllFilters
+};
 })();

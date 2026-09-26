@@ -29,18 +29,30 @@ body:JSON.stringify(body)
 }).then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r;});
 }
 
+function hideOffline(){
+  try{return localStorage.getItem('andrux_hide_offline')==='1';}catch(e){return false;}
+}
+
 function loadGames(){
 var sel=$('execRequireGame');
 if(!sel)return;
 apiGet(TABLE+'?select=place_id,game_name,player_count,status&hidden=eq.false&order=game_name.asc')
 .then(function(rows){
 if(!rows||!rows.length){sel.innerHTML='<option value="">没有服务器</option>';return;}
-var online=rows.filter(function(r){return r.status==='online';});
-if(!online.length){sel.innerHTML='<option value="">没有在线服务器</option>';return;}
-sel.innerHTML=online.map(function(r){
+var hideOff=hideOffline();
+var filtered=rows.filter(function(r){
+  if(hideOff&&r.status!=='online')return false;
+  return true;
+});
+if(!filtered.length){
+  sel.innerHTML='<option value="">'+(hideOff?'没有在线服务器':'没有服务器')+'</option>';
+  return;
+}
+sel.innerHTML=filtered.map(function(r){
 var name=r.game_name||r.place_id;
-var pc=r.player_count||0;
-return'<option value="'+r.place_id+'">'+name+' ('+pc+')</option>';
+var pc=(r.status==='online')?(r.player_count||0):0;
+var statusTag=(r.status==='online')?'':' [离线]';
+return'<option value="'+r.place_id+'"'+(r.status==='online'?'':' data-offline="1"')+'>'+name+statusTag+' ('+pc+')</option>';
 }).join('');
 })
 .catch(function(){sel.innerHTML='<option value="">加载失败</option>';});
@@ -156,4 +168,12 @@ var _obs=new MutationObserver(function(){
 setTimeout(init,100);
 });
 _obs.observe(document.body,{childList:true,subtree:true});
+
+/* Refresh game list when hide-offline setting changes */
+window.addEventListener('storage',function(e){
+  if(e.key==='andrux_hide_offline'){loadGames();}
+});
+window.addEventListener('andrux_hide_offline_change',function(){loadGames();});
+
+window.AxExecAsset={reload:loadGames};
 })();

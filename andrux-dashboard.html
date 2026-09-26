@@ -7,24 +7,24 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob: https:; connect-src https://*.supabase.co https://api.ipify.org; object-src 'none'; base-uri 'none'; frame-ancestors 'none'">
 <title>Andrux</title>
 <link rel="stylesheet" href="./assets/styles.css">
+<style>
+.auth-card{grid-template-columns:1fr;width:min(460px,100%);min-height:auto}
+.auth-panel{min-height:auto;padding:44px}
+.auth-panel .brand-lockup{justify-content:center;margin-bottom:26px;color:var(--ink)}
+.auth-panel .brand-mark{width:38px;height:38px;border-radius:12px;border-color:var(--rule);background:var(--bg);color:var(--ink);font-size:13px}
+@media(max-width:600px){
+.auth-panel{padding:26px}
+}
+</style>
 </head>
 <body data-page="auth">
 <section id="authShell" class="auth-shell">
 <div class="auth-card">
-<div class="auth-story">
+<div class="auth-panel">
 <div class="brand-lockup">
 <div class="brand-mark">AX</div>
 <div>Andrux</div>
 </div>
-<h1 data-i18n="auth.headline">玩家控制台，干净而有秩序。</h1>
-<p data-i18n="auth.intro">登录或注册后才能进入仪表盘与社区。社区内置频率限制、重复内容限制、关键词内容拦截、消息撤回和专用右键菜单。</p>
-<div class="story-grid">
-<div class="story-tile"><b>3</b><span data-i18n="auth.story1">社区分区：普通聊天区、脚本区、Require 区</span></div>
-<div class="story-tile"><b>60s</b><span data-i18n="auth.story2">自己的消息在一分钟内可撤回，过时不可撤回</span></div>
-<div class="story-tile"><b>0</b><span data-i18n="auth.story3">界面不使用表情符号，风格更像真实产品</span></div>
-</div>
-</div>
-<div class="auth-panel">
 <div class="tabs" aria-label="Login / Register">
 <button class="tab-btn active" data-auth-tab="login" data-i18n="auth.login_tab">登录</button>
 <button class="tab-btn" data-auth-tab="register" data-i18n="auth.register_tab">注册</button>
