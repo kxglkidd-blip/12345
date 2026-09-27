@@ -191,11 +191,11 @@ window.I18N = {
       /* ===== Dashboard ===== */
       'dash.eyebrow': '控制台',
       'dash.title': '仪表盘',
-      'dash.whitelist_eyebrow': 'Whitelist',
+      'dash.whitelist_eyebrow': '白名单',
       'dash.whitelist_title': '最近白名单更改',
-      'dash.login_eyebrow': 'Activity',
+      'dash.login_eyebrow': '动态',
       'dash.login_title': '最近登录状态',
-      'dash.game_eyebrow': 'Game',
+      'dash.game_eyebrow': '游戏',
       'dash.game_title': '当前游戏状态',
       'dash.loading': '加载中...',
       'dash.no_online_games': '无在线游戏',
@@ -211,6 +211,28 @@ window.I18N = {
       'dash.just_now': '刚刚',
       'dash.min_ago': ' 分钟前',
       'dash.hour_ago': ' 小时前',
+      'dash.m_games': '在线游戏',
+      'dash.view_all': '查看全部 →',
+      'dash.m_players': '总玩家数',
+      'dash.live': '实时',
+      'dash.m_execs': '已执行脚本',
+      'dash.all_time': '累计',
+      'dash.rbx_title': '设置你的 Roblox 用户名',
+      'dash.rbx_sub': '将你的 Roblox 账户与 Andrux 绑定，实现无缝集成。',
+      'dash.rbx_ph': '输入 Roblox 用户名',
+      'dash.rbx_btn': '绑定账户',
+      'dash.guide': '快速入门指南',
+      'dash.step1': '在上方设置你的 Roblox 用户名',
+      'dash.step2': '从游戏页面加入游戏',
+      'dash.step3': '打开执行器，运行你的第一个脚本',
+      'dash.launch_title': '快速启动',
+      'dash.launch_sub': '热门游戏',
+      'dash.launch_random': '加入随机热门游戏',
+      'dash.loading_games': '正在加载在线游戏...',
+      'dash.launch_btn': '启动',
+      'dash.card_game': '浏览可用游戏',
+      'dash.card_exec': '运行 Lua 脚本',
+      'dash.card_script': '浏览与管理你的脚本',
 
       /* ===== Community ===== */
       'comm.eyebrow': '社区',
@@ -681,6 +703,28 @@ window.I18N = {
       'dash.just_now': 'Just now',
       'dash.min_ago': ' min ago',
       'dash.hour_ago': ' hr ago',
+      'dash.m_games': 'Online Games',
+      'dash.view_all': 'View all →',
+      'dash.m_players': 'Total Players',
+      'dash.live': 'Live',
+      'dash.m_execs': 'Scripts Executed',
+      'dash.all_time': 'All time',
+      'dash.rbx_title': 'Set Your Roblox Username',
+      'dash.rbx_sub': 'Link your Roblox account to Andrux for seamless integration.',
+      'dash.rbx_ph': 'Enter Roblox username',
+      'dash.rbx_btn': 'Set Account',
+      'dash.guide': 'Quick Start Guide',
+      'dash.step1': 'Set your Roblox username above',
+      'dash.step2': 'Join a game from the Games page',
+      'dash.step3': 'Open the Executor and run your first script',
+      'dash.launch_title': 'Quick Launch',
+      'dash.launch_sub': 'Popular games',
+      'dash.launch_random': 'Join a random popular game',
+      'dash.loading_games': 'Loading online games...',
+      'dash.launch_btn': 'Launch',
+      'dash.card_game': 'Browse available games',
+      'dash.card_exec': 'Run Lua scripts',
+      'dash.card_script': 'Browse and manage your scripts',
 
       /* ===== Community ===== */
       'comm.eyebrow': 'Community',
@@ -1059,6 +1103,7 @@ window.I18N = {
   setLang: function(lang) {
     this.lang = lang;
     localStorage.setItem('andrux_lang', lang);
+    try { window.dispatchEvent(new CustomEvent('andrux_lang_change', { detail: { lang: lang } })); } catch (e) {}
     this.apply();
     var t = document.getElementById('toast');
     if (t) {

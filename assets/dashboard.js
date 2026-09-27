@@ -150,6 +150,12 @@ function loadExecCount(){
     }else{
       execCount=0;
     }
+    // Never show less than what this device has already executed
+    try{
+      var local=parseInt(localStorage.getItem('andrux_total_execs')||'0',10)||0;
+      if(local>execCount)execCount=local;
+      else localStorage.setItem('andrux_total_execs',String(execCount));
+    }catch(e){}
     renderMetrics();
   })
   .catch(function(){
@@ -224,10 +230,13 @@ function joinRandomGame(){
   toast('正在加入: '+(game.game_name||game.place_id));
   // Open the Roblox deep link
   try{
-    window.location.href=url;
+    if(window.andruxDesktop&&typeof window.andruxDesktop.openExternal==='function'){
+      window.andruxDesktop.openExternal(url);
+    }else{
+      window.location.href=url;
+    }
   }catch(e){
-    // Fallback: open in new tab
-    window.open(url,'_blank');
+    try{window.open(url,'_blank');}catch(_){toast('无法唤起 Roblox');}
   }
 }
 
@@ -369,6 +378,12 @@ if(document.readyState==='loading'){
 }else{init();}
 setTimeout(init,500);
 setTimeout(init,2000);
+
+// Same-tab live update when a script is pushed
+window.addEventListener('andrux_exec_logged',function(e){
+  var n=e&&e.detail&&e.detail.total;
+  if(n&&n>execCount){execCount=n;renderMetrics();}
+});
 
 // React to storage changes from other tabs
 window.addEventListener('storage',function(e){

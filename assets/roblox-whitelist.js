@@ -125,6 +125,8 @@ showFallback();
 
 var bindings=[];
 var _loading=false;
+var _lastSig=null;
+function curLang(){try{return localStorage.getItem('andrux_lang')||'';}catch(e){return '';}}
 
 function loadBindings(){
 if(_loading)return;
@@ -185,6 +187,11 @@ if(count)count.textContent=bindings.length+'/5';
 if(toggle)toggle.style.display=bindings.length>=5?'none':'';
 
 if(!area)return;
+
+/* Only touch the DOM when data or language actually changed */
+var sig=curLang()+'|'+JSON.stringify(bindings.map(function(b){return[b.roblox_name,b.roblox_user_id,b.pending_count];}));
+if(sig===_lastSig&&area.children.length)return;
+_lastSig=sig;
 
 if(bindings.length===0){
 area.innerHTML='<div style="text-align:center;padding:20px 0">'+
@@ -269,6 +276,7 @@ if(!confirm(t('rbx.unbind_confirm')+robloxName+' ?'))return;
 rpc('ax_unbind_roblox',{p_username:user,p_roblox_name:robloxName})
 .then(function(res){
 if(res&&res.ok){
+_lastSig=null;
 toast(t('rbx.unbinded')+robloxName);
 loadBindings();
 }else{toast(t('rbx.unbind_fail'));}
@@ -277,7 +285,9 @@ loadBindings();
 }
 
 var _wlInterval=false;
-function init(){
+var _inited=false;
+function init(force){
+if(_inited&&!force)return;
 var btn=$('wlBindBtn');
 if(!btn)return;
 var toggle=$('wlAddToggle');
@@ -301,7 +311,8 @@ if(cancelBtn)cancelBtn.textContent=t('misc.cancel');
 var bindInput=$('wlBindInput');
 if(bindInput)bindInput.setAttribute('placeholder',t('rbx.bind_ph'));
 
-// Re-render accounts with new language
+_inited=true;
+// Re-render accounts only if language changed (signature check inside)
 if(bindings.length>0)renderAccounts();
 
 if(!_wlInterval){
@@ -311,20 +322,19 @@ setInterval(loadBindings,15000);
 }
 }
 
+function boot(){init(false);}
 if(document.readyState==='loading'){
-document.addEventListener('DOMContentLoaded',init);
-}else{init();}
-setTimeout(init,500);
-setTimeout(init,2000);
-setTimeout(init,4000);
+document.addEventListener('DOMContentLoaded',boot);
+}else{boot();}
+/* Fallback retries only until the page elements exist */
+setTimeout(boot,500);
+setTimeout(boot,2000);
 
-// Listen for language changes
+// Re-apply text only when the language changes (no MutationObserver loop)
+function onLang(){setTimeout(function(){init(true);},50);}
 window.addEventListener('storage',function(e){
-if(e.key==='andrux_lang'){setTimeout(init,50);}
+if(e.key==='andrux_lang')onLang();
 });
-
-var _obs=new MutationObserver(function(){
-setTimeout(init,100);
-});
-_obs.observe(document.body,{childList:true,subtree:true});
+window.addEventListener('andrux_lang_change',onLang);
+document.addEventListener('i18n:changed',onLang);
 })();

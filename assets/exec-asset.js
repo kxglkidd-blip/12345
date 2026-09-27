@@ -29,6 +29,20 @@ body:JSON.stringify(body)
 }).then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r;});
 }
 
+/* ===== Execution log: insert into ax_exec_log + bump local counter ===== */
+function logExec(placeId,robloxName,source){
+try{
+var n=(parseInt(localStorage.getItem('andrux_total_execs')||'0',10)||0)+1;
+localStorage.setItem('andrux_total_execs',String(n));
+window.dispatchEvent(new CustomEvent('andrux_exec_logged',{detail:{total:n}}));
+}catch(e){}
+return fetch(SU+'/rest/v1/ax_exec_log',{
+method:'POST',
+headers:Object.assign({},HDRS,{Prefer:'return=minimal'}),
+body:JSON.stringify({place_id:String(placeId),roblox_name:robloxName||null,source:source})
+}).catch(function(){});
+}
+
 function hideOffline(){
   try{return localStorage.getItem('andrux_hide_offline')==='1';}catch(e){return false;}
 }
@@ -96,6 +110,7 @@ queue.push(entry);
 return apiPatch(TABLE+'?place_id=eq.'+placeId,{exec_queue:queue});
 })
 .then(function(){
+logExec(placeId,username,'exec_asset');
 toast('已推送: require('+parsed.asset_id+')'+parsed.suffix+'("'+username+'")');
 if(st)st.textContent='已推送 require('+parsed.asset_id+')'+parsed.suffix+'("'+username+'")';
 inp.value='';

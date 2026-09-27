@@ -6,5 +6,6 @@ contextBridge.exposeInMainWorld('andruxDesktop', {
   version: process.versions.electron,
   minimize: () => ipcRenderer.send('window-minimize'),
   maximize: () => ipcRenderer.send('window-maximize'),
-  close: () => ipcRenderer.send('window-close')
+  close: () => ipcRenderer.send('window-close'),
+  openExternal: (url) => ipcRenderer.invoke('open-external', String(url || ''))
 });

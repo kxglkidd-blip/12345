@@ -133,30 +133,30 @@
       <div class="dash-metric-icon game">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="4"/><line x1="7" y1="12" x2="11" y2="12"/><line x1="9" y1="10" x2="9" y2="14"/><circle cx="16" cy="11" r="1" fill="currentColor"/><circle cx="18" cy="13" r="1" fill="currentColor"/></svg>
       </div>
-      <span>现场比赛</span>
+      <span data-i18n="dash.m_games">在线游戏</span>
     </div>
     <div class="dash-metric-value" id="metricGames">--</div>
-    <div class="dash-metric-foot"><a href="./game.html">查看所有 &rarr;</a></div>
+    <div class="dash-metric-foot"><a href="./game.html" data-i18n="dash.view_all">查看全部 →</a></div>
   </div>
   <div class="dash-metric">
     <div class="dash-metric-head">
       <div class="dash-metric-icon players">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
       </div>
-      <span>总玩家数</span>
+      <span data-i18n="dash.m_players">总玩家数</span>
     </div>
     <div class="dash-metric-value" id="metricPlayers">--</div>
-    <div class="dash-metric-foot"><span class="live-dot"></span>现场</div>
+    <div class="dash-metric-foot"><span class="live-dot"></span><span data-i18n="dash.live">实时</span></div>
   </div>
   <div class="dash-metric">
     <div class="dash-metric-head">
       <div class="dash-metric-icon exec">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
       </div>
-      <span>已执行的副本</span>
+      <span data-i18n="dash.m_execs">已执行脚本</span>
     </div>
     <div class="dash-metric-value" id="metricExecs">--</div>
-    <div class="dash-metric-foot">历时</div>
+    <div class="dash-metric-foot" data-i18n="dash.all_time">累计</div>
   </div>
 </div>
 
@@ -164,28 +164,28 @@
 <div class="dash-main">
   <!-- 左栏：设置用户名 + 快速入门 -->
   <div class="dash-card">
-    <h3>设置你的 Roblox 用户名</h3>
-    <p class="dash-card-sub">将你的 Roblox 账户与 Andrux 绑定，实现无缝集成。</p>
+    <h3 data-i18n="dash.rbx_title">设置你的 Roblox 用户名</h3>
+    <p class="dash-card-sub" data-i18n="dash.rbx_sub">将你的 Roblox 账户与 Andrux 绑定，实现无缝集成。</p>
     <div class="dash-rbx-row">
-      <input type="text" class="dash-rbx-input" id="dashRbxInput" placeholder="输入 Roblox 用户名" maxlength="20">
-      <button class="dash-rbx-btn" id="dashRbxBtn">设定账户</button>
+      <input type="text" class="dash-rbx-input" id="dashRbxInput" placeholder="输入 Roblox 用户名" data-i18n-ph="dash.rbx_ph" maxlength="20">
+      <button class="dash-rbx-btn" id="dashRbxBtn" data-i18n="dash.rbx_btn">绑定账户</button>
     </div>
     <div class="dash-rbx-status" id="dashRbxStatus"></div>
 
     <div class="dash-guide">
-      <h4>快速入门指南</h4>
+      <h4 data-i18n="dash.guide">快速入门指南</h4>
       <div class="dash-steps">
         <div class="dash-step">
           <div class="dash-step-num">1</div>
-          <div class="dash-step-text"><b>请在上面设置你的 Roblox 用户名</b></div>
+          <div class="dash-step-text"><b data-i18n="dash.step1">在上方设置你的 Roblox 用户名</b></div>
         </div>
         <div class="dash-step">
           <div class="dash-step-num">2</div>
-          <div class="dash-step-text"><b>从游戏页面加入游戏</b></div>
+          <div class="dash-step-text"><b data-i18n="dash.step2">从游戏页面加入游戏</b></div>
         </div>
         <div class="dash-step">
           <div class="dash-step-num">3</div>
-          <div class="dash-step-text"><b>打开执行器，运行你的第一个脚本</b></div>
+          <div class="dash-step-text"><b data-i18n="dash.step3">打开执行器，运行你的第一个脚本</b></div>
         </div>
       </div>
     </div>
@@ -193,19 +193,19 @@
 
   <!-- 右栏：快速发射 -->
   <div class="dash-card dash-launch">
-    <h3>快速发射</h3>
-    <p class="dash-card-sub">热门游戏</p>
+    <h3 data-i18n="dash.launch_title">快速启动</h3>
+    <p class="dash-card-sub" data-i18n="dash.launch_sub">热门游戏</p>
     <div class="dash-launch-area">
       <div class="dash-launch-icon">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
       </div>
-      <div class="dash-launch-title">加入随机热门游戏</div>
+      <div class="dash-launch-title" data-i18n="dash.launch_random">加入随机热门游戏</div>
       <div class="dash-launch-info">
         <span class="live-dot"></span>
-        <span id="launchOnlineInfo">正在加载在线游戏...</span>
+        <span id="launchOnlineInfo" data-i18n="dash.loading_games">正在加载在线游戏...</span>
       </div>
       <button class="dash-launch-btn" id="dashLaunchBtn">
-        发射
+        <span data-i18n="dash.launch_btn">启动</span>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
       </button>
     </div>
@@ -218,22 +218,22 @@
     <div class="dash-nav-icon game">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="4"/><line x1="7" y1="12" x2="11" y2="12"/><line x1="9" y1="10" x2="9" y2="14"/><circle cx="16" cy="11" r="1" fill="currentColor"/><circle cx="18" cy="13" r="1" fill="currentColor"/></svg>
     </div>
-    <b>游戏</b>
-    <span>浏览可用游戏</span>
+    <b data-i18n="nav.game">游戏</b>
+    <span data-i18n="dash.card_game">浏览可用游戏</span>
   </a>
   <a class="dash-nav-card" href="./executor.html">
     <div class="dash-nav-icon exec">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
     </div>
-    <b>执行人</b>
-    <span>运行 Lua 脚本</span>
+    <b data-i18n="nav.executor">执行器</b>
+    <span data-i18n="dash.card_exec">运行 Lua 脚本</span>
   </a>
   <a class="dash-nav-card" href="./scripthub.html">
     <div class="dash-nav-icon script">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
     </div>
-    <b>剧本</b>
-    <span>你的脚本中心</span>
+    <b data-i18n="nav.scripthub">脚本中心</b>
+    <span data-i18n="dash.card_script">浏览与管理你的脚本</span>
   </a>
 </div>
 

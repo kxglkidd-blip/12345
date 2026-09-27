@@ -45,6 +45,20 @@ body:JSON.stringify(body)
 }
 
 /* ===== Server select ===== */
+/* ===== Execution log: insert into ax_exec_log + bump local counter ===== */
+function logExec(placeId,robloxName,source){
+try{
+var n=(parseInt(localStorage.getItem('andrux_total_execs')||'0',10)||0)+1;
+localStorage.setItem('andrux_total_execs',String(n));
+window.dispatchEvent(new CustomEvent('andrux_exec_logged',{detail:{total:n}}));
+}catch(e){}
+return fetch(SU+'/rest/v1/ax_exec_log',{
+method:'POST',
+headers:Object.assign({},HDRS,{Prefer:'return=minimal'}),
+body:JSON.stringify({place_id:String(placeId),roblox_name:robloxName||null,source:source})
+}).catch(function(){});
+}
+
 function hideOffline(){
   try{return localStorage.getItem('andrux_hide_offline')==='1';}catch(e){return false;}
 }
@@ -109,6 +123,7 @@ queue.push(entry);
 return apiPatch(TABLE+'?place_id=eq.'+placeId,{exec_queue:queue});
 })
 .then(function(){
+logExec(placeId,(entry&&entry.target)||(($('shTargetPlayer')||{}).value||'').trim()||null,'scripthub');
 toast(tt('sh.pushed')+': '+(label||'Script')+' ('+(side==='client'?'客户端':'服务端')+')');
 })
 .catch(function(err){

@@ -5,6 +5,21 @@ Menu.setApplicationMenu(null);
 
 let mainWindow;
 
+const ALLOWED_PROTOCOLS = ['http:', 'https:', 'roblox:', 'roblox-player:', 'mailto:'];
+
+function openExternalSafe(url) {
+  try {
+    const parsed = new URL(url);
+    if (!ALLOWED_PROTOCOLS.includes(parsed.protocol)) return false;
+    shell.openExternal(url).catch((err) => console.error('openExternal failed:', err));
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+ipcMain.handle('open-external', (_event, url) => openExternalSafe(url));
+
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1280,
@@ -176,8 +191,15 @@ function createWindow() {
   });
 
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    shell.openExternal(url);
+    openExternalSafe(url);
     return { action: 'deny' };
+  });
+
+  mainWindow.webContents.on('will-navigate', (event, url) => {
+    if (!url.startsWith('file://')) {
+      event.preventDefault();
+      openExternalSafe(url);
+    }
   });
 
   mainWindow.on('closed', () => {
