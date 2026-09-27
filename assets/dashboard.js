@@ -241,9 +241,6 @@ function joinRandomGame(){
 }
 
 /* ===== Roblox username binding ===== */
-var _rbxBindings=[];
-var _binding=false;
-
 function resolveRobloxUserId(username){
   return fetch(ROBLOX_API,{
     method:'POST',
@@ -258,47 +255,12 @@ function resolveRobloxUserId(username){
   }).catch(function(){return null;});
 }
 
-function isNameBound(name){
-  if(!name)return false;
-  var lower=name.toLowerCase();
-  for(var i=0;i<_rbxBindings.length;i++){
-    if((_rbxBindings[i].roblox_name||'').toLowerCase()===lower)return true;
-  }
-  return false;
-}
-
-function updateRbxStatus(){
-  var input=$('dashRbxInput');
-  var btn=$('dashRbxBtn');
-  var status=$('dashRbxStatus');
-  if(!input||!btn)return;
-  var name=input.value.trim();
-  if(!name){
-    if(_rbxBindings.length>0){
-      if(status){status.textContent='当前已绑定 '+_rbxBindings.length+' 个账号，前往白名单页管理';status.className='dash-rbx-status ok';}
-    }else{
-      if(status){status.textContent='';status.className='dash-rbx-status';}
-    }
-    btn.textContent='绑定账户';
-    return;
-  }
-  if(isNameBound(name)){
-    if(status){status.textContent='此用户名已绑定，前往白名单页解绑后可更换';status.className='dash-rbx-status ok';}
-    btn.textContent='已绑定';
-    btn.disabled=true;
-  }else{
-    if(status){status.textContent='';status.className='dash-rbx-status';}
-    btn.textContent='绑定账户';
-    btn.disabled=false;
-  }
-}
-
 function bindRobloxUsername(){
   var user=getSession();
   var input=$('dashRbxInput');
   var btn=$('dashRbxBtn');
   var status=$('dashRbxStatus');
-  if(!input||!btn||_binding)return;
+  if(!input||!btn)return;
 
   var name=input.value.trim();
   if(!name){
@@ -313,14 +275,7 @@ function bindRobloxUsername(){
     if(status){status.textContent='请先登录';status.className='dash-rbx-status err';}
     return;
   }
-  if(isNameBound(name)){
-    if(status){status.textContent='已绑定过此用户名，前往白名单页解绑';status.className='dash-rbx-status err';}
-    btn.textContent='已绑定';
-    btn.disabled=true;
-    return;
-  }
 
-  _binding=true;
   btn.disabled=true;
   btn.textContent='绑定中...';
   if(status){status.textContent='正在验证用户名...';status.className='dash-rbx-status';}
@@ -333,7 +288,7 @@ function bindRobloxUsername(){
     });
   }).then(function(res){
     if(res&&res.ok){
-      if(status){status.textContent='绑定成功: '+name;status.className='dash-rbx-status ok';}
+      if(status){status.textContent='已绑定: '+name;status.className='dash-rbx-status ok';}
       toast('已绑定: '+name);
       input.value='';
       loadWhitelistBindings();
@@ -341,28 +296,26 @@ function bindRobloxUsername(){
       var err=res?res.error:'unknown';
       var msg='绑定失败';
       if(err==='limit_reached')msg='已绑定5个账号，请先解绑';
-      else if(err==='already_bound'){msg='已绑定过此用户名';btn.textContent='已绑定';btn.disabled=true;}
+      else if(err==='already_bound')msg='已绑定过此用户名';
       else msg='绑定失败: '+err;
       if(status){status.textContent=msg;status.className='dash-rbx-status err';}
     }
   }).catch(function(e){
     if(status){status.textContent='绑定失败: '+(e.message||e);status.className='dash-rbx-status err';}
   }).then(function(){
-    _binding=false;
-    if(btn.textContent!=='已绑定'){btn.disabled=false;btn.textContent='绑定账户';}
+    btn.disabled=false;
+    btn.textContent='设定账户';
   });
 }
 
-/* ===== Load current bindings and update UI ===== */
+/* ===== Pre-fill current bound username ===== */
 function prefillBoundUser(){
   var input=$('dashRbxInput');
   if(!input)return;
   loadWhitelistBindings().then(function(bindings){
-    _rbxBindings=bindings||[];
-    if(_rbxBindings.length>0&&!input.value){
-      input.value=_rbxBindings[0].roblox_name||'';
+    if(bindings&&bindings.length>0&&!input.value){
+      input.value=bindings[0].roblox_name||'';
     }
-    updateRbxStatus();
   });
 }
 
@@ -408,7 +361,6 @@ function init(){
     rbxInput.addEventListener('keydown',function(e){
       if(e.key==='Enter'){e.preventDefault();bindRobloxUsername();}
     });
-    rbxInput.addEventListener('input',function(){updateRbxStatus();});
   }
 
   // Load data

