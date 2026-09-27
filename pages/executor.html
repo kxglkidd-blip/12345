@@ -81,40 +81,12 @@
 </div>
 <div id="execCharCount" style="color:var(--muted);font-size:12px" data-i18n="exec.char_count">0 字符</div>
 </div>
-<div class="exec-mode-tabs" style="display:flex;gap:0;margin-bottom:14px;border-radius:10px;overflow:hidden;border:1px solid var(--rule)">
-<button class="exec-mode-btn active" data-mode="lua" type="button" style="flex:1;padding:9px;border:none;background:var(--accent);color:#fff;font-size:13px;cursor:pointer;font-weight:600;transition:background .2s,color .2s">Lua</button>
-<button class="exec-mode-btn" data-mode="require" type="button" style="flex:1;padding:9px;border:none;background:var(--surface);color:var(--muted);font-size:13px;cursor:pointer;font-weight:600;transition:background .2s,color .2s">Require</button>
-</div>
-<div id="execLuaPanel">
 <textarea id="execScriptInput" class="exec-editor selectable" data-i18n-ph="exec.placeholder" placeholder="在此输入 Lua 脚本..." spellcheck="false"></textarea>
 <div class="exec-actions">
 <button id="execSendBtn" class="primary-btn" type="button" data-i18n="exec.execute">执行</button>
 <button id="execClearBtn" class="ghost-btn" type="button" data-i18n="exec.clear">清空编辑器</button>
 </div>
 <div id="execStatus" class="notice" data-i18n="exec.status_idle">选择一个在线服务器，输入脚本后执行。</div>
-</div>
-<div id="execRequirePanel" style="display:none">
-<div class="field" style="margin-bottom:12px">
-<label for="execRequireGame" style="display:block;margin-bottom:6px;font-size:13px;color:var(--muted)">目标服务器</label>
-<select id="execRequireGame" style="width:100%;padding:10px;border:1px solid var(--rule);border-radius:12px;background:var(--surface);color:var(--ink);font-size:14px;box-sizing:border-box">
-<option value="">加载中...</option>
-</select>
-</div>
-<div class="field" style="margin-bottom:12px">
-<label for="execRequireInput" style="display:block;margin-bottom:6px;font-size:13px;color:var(--muted)">资产 ID</label>
-<input id="execRequireInput" type="text" autocomplete="off" placeholder="12345 或 12345.func 或 12345:method" spellcheck="false" style="width:100%;padding:10px;border:1px solid var(--rule);border-radius:12px;background:var(--surface);color:var(--ink);font-size:14px;box-sizing:border-box">
-</div>
-<div class="field" style="margin-bottom:12px">
-<label for="execRequireUser" style="display:block;margin-bottom:6px;font-size:13px;color:var(--muted)">玩家用户名</label>
-<input id="execRequireUser" type="text" autocomplete="off" placeholder="Roblox 玩家用户名（传给脚本的参数）" spellcheck="false" style="width:100%;padding:10px;border:1px solid var(--rule);border-radius:12px;background:var(--surface);color:var(--ink);font-size:14px;box-sizing:border-box">
-</div>
-<div class="exec-actions">
-<button id="execRequireSendBtn" class="primary-btn" type="button" data-i18n="exec.execute">执行</button>
-<button id="execRequireClearBtn" class="ghost-btn" type="button">清空</button>
-<button id="execRequireRefreshBtn" class="ghost-btn" type="button">刷新服务器</button>
-</div>
-<div id="execRequireStatus" class="notice" data-i18n="exec.require_status">选择服务器，输入资产 ID 和玩家用户名后执行。</div>
-<div class="hint" style="margin-top:10px">格式：12345 = require(12345) | 12345:run = require(12345):run("用户名") | 用户名会作为参数传给脚本方法</div>
 </div>
 </div>
 </div>
