@@ -665,4 +665,56 @@ setTimeout(function(){loadTitles(function(){injectMessageTitles();injectProfileT
 setTimeout(injectIPButtons,2500);
 setTimeout(injectIPButtons,5000);
 setTimeout(function(){loadTitles(function(){injectMessageTitles();injectProfileTitle();});},4000);
+
+/* ===== Game Page Fixes: broken cover images + offline player count zero ===== */
+(function(){
+'use strict';
+var STALE_MS=5*60*1000; /* 5 min */
+
+function fixGameCard(card){
+  if(!card||card._gxFixed)return;
+  card._gxFixed=true;
+
+  /* 1. Broken cover image -> fall back to no-bg mode */
+  var bg=card.querySelector('.gc-bg');
+  if(bg){
+    var bgUrl=bg.style.backgroundImage||'';
+    if(bgUrl&&bgUrl!=='none'){
+      var m=bgUrl.match(/url\(["']?([^"')]+)["']?\)/);
+      if(m&&m[1]){
+        var img=new Image();
+        img.onerror=function(){
+          card.classList.remove('gc-has-bg');
+          card.classList.add('gc-no-bg');
+          if(bg)bg.style.backgroundImage='';
+        };
+        img.src=m[1];
+      }
+    }
+  }
+
+  /* 2. Offline games -> force player count to 0 */
+  if(card.classList.contains('gc-offline')||card.classList.contains('offline')){
+    var pn=card.querySelector('.gc-player-num');
+    if(pn)pn.textContent='0';
+  }
+}
+
+function scanAndFix(){
+  var cards=document.querySelectorAll('.gc');
+  for(var i=0;i<cards.length;i++){fixGameCard(cards[i]);}
+}
+
+var _gxObs=new MutationObserver(function(){
+  clearTimeout(_gxObs._t);
+  _gxObs._t=setTimeout(scanAndFix,150);
+});
+_gxObs.observe(document.body,{childList:true,subtree:true});
+
+setTimeout(scanAndFix,500);
+setTimeout(scanAndFix,1500);
+setTimeout(scanAndFix,3000);
+setInterval(scanAndFix,10000);
+})();
+
 })();

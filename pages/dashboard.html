@@ -1,45 +1,85 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="referrer" content="no-referrer">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob: https:; connect-src https://*.supabase.co https://api.ipify.org; object-src 'none'; base-uri 'none'; frame-ancestors 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob: https:; connect-src https://*.supabase.co https://api.ipify.org https://users.roproxy.com; object-src 'none'; base-uri 'none'; frame-ancestors 'none'">
 <title>Andrux Dashboard</title>
 <link rel="stylesheet" href="../assets/styles.css">
 <style>
-.dash-grid{display:grid;grid-template-columns:1fr 340px;gap:16px;margin-top:20px}
-.dash-col-left{display:flex;flex-direction:column;gap:16px}
-.dash-col-right{display:flex;flex-direction:column;gap:16px}
-.dash-card{background:var(--surface);border:1px solid var(--rule);border-radius:14px;padding:18px}
-.dash-card .dash-card-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
-.dash-card .dash-card-head h3{font-size:15px;font-weight:700;color:var(--ink);margin:0}
-.dash-card .dash-card-head .eyebrow{font-size:11px}
-.dash-list{display:flex;flex-direction:column;gap:10px;max-height:380px;overflow-y:auto;padding-right:4px}
-.dash-list::-webkit-scrollbar{width:5px}
-.dash-list::-webkit-scrollbar-track{background:transparent}
-.dash-list::-webkit-scrollbar-thumb{background:rgba(0,0,0,.15);border-radius:3px}
-.dash-item{display:flex;align-items:center;gap:12px;padding:10px 12px;background:var(--bg);border-radius:10px;border:1px solid var(--rule)}
-.dash-item-icon{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0}
-.dash-item-icon.add{background:rgba(32,90,51,.15);color:#2d7a3f}
-.dash-item-icon.remove{background:rgba(138,45,45,.15);color:#b03a3a}
-.dash-item-icon.login{background:rgba(59,82,102,.15);color:#3b5266}
-.dash-item-icon.logout{background:rgba(138,45,45,.1);color:#8a5a2d}
-.dash-item-body{flex:1;min-width:0}
-.dash-item-body b{font-size:13px;color:var(--ink);font-weight:600;display:block;margin-bottom:2px}
-.dash-item-body span{font-size:11px;color:var(--muted)}
-.dash-item-time{font-size:11px;color:var(--muted);flex-shrink:0}
-.dash-game-item{display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--bg);border-radius:10px;border:1px solid var(--rule);margin-bottom:8px}
-.dash-game-item:last-child{margin-bottom:0}
-.dash-game-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;background:#bbb}
-.dash-game-dot.online{background:#2d7a3f;box-shadow:0 0 6px rgba(45,122,63,.5)}
-.dash-game-name{flex:1;font-size:13px;font-weight:600;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.dash-game-count{font-size:12px;color:var(--muted);flex-shrink:0}
-.dash-empty{text-align:center;padding:30px 10px;color:var(--muted);font-size:13px}
-.dash-bottom-row{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+/* ===== Dashboard Redesign ===== */
+.dash-metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin-bottom:20px;}
+.dash-metric{position:relative;border:1px solid var(--rule);border-radius:var(--radius);padding:22px;background:rgba(255,250,241,0.7);box-shadow:0 18px 60px rgba(33,26,16,0.07);backdrop-filter:blur(10px);transition:transform var(--speed) var(--ease),box-shadow var(--speed) var(--ease);}
+.dash-metric:hover{transform:translateY(-2px);box-shadow:0 22px 70px rgba(33,26,16,0.1);}
+.dash-metric-head{display:flex;align-items:center;gap:10px;margin-bottom:14px;}
+.dash-metric-icon{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.dash-metric-icon svg{width:20px;height:20px;display:block;}
+.dash-metric-icon.game{background:rgba(32,58,51,0.12);color:var(--accent2);}
+.dash-metric-icon.players{background:rgba(111,77,45,0.12);color:var(--accent);}
+.dash-metric-icon.exec{background:rgba(138,45,45,0.1);color:var(--bad);}
+.dash-metric-head span{font-size:14px;font-weight:700;color:var(--ink);}
+.dash-metric-value{font-size:42px;font-weight:700;letter-spacing:-0.05em;line-height:1;color:var(--ink);}
+.dash-metric-foot{position:absolute;bottom:18px;right:22px;font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px;}
+.dash-metric-foot a{color:var(--accent);text-decoration:none;font-weight:600;}
+.dash-metric-foot .live-dot{width:7px;height:7px;border-radius:50%;background:var(--ok);box-shadow:0 0 6px rgba(45,111,82,0.5);}
+
+.dash-main{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;}
+.dash-card{border:1px solid var(--rule);border-radius:var(--radius);padding:22px;background:rgba(255,250,241,0.7);box-shadow:0 18px 60px rgba(33,26,16,0.07);backdrop-filter:blur(10px);}
+.dash-card h3{margin:0 0 6px;font-size:18px;font-weight:700;color:var(--ink);}
+.dash-card .dash-card-sub{margin:0 0 16px;color:var(--muted);font-size:13px;line-height:1.5;}
+
+/* Roblox username setup */
+.dash-rbx-row{display:flex;gap:10px;}
+.dash-rbx-input{flex:1;min-width:0;border:1px solid var(--rule);border-radius:14px;padding:12px 16px;color:var(--ink);background:rgba(255,255,255,0.72);outline:none;font-size:14px;user-select:text;}
+.dash-rbx-input:focus{border-color:var(--accent);box-shadow:0 0 0 4px rgba(111,77,45,0.13);}
+.dash-rbx-btn{border:0;border-radius:14px;padding:12px 22px;font-weight:700;font-size:14px;color:var(--bg2);background:var(--accent2);white-space:nowrap;transition:filter var(--speed) var(--ease),transform var(--speed) var(--ease);}
+.dash-rbx-btn:hover{filter:brightness(1.06);}
+.dash-rbx-btn:active{transform:translateY(1px);}
+.dash-rbx-btn:disabled{opacity:0.6;cursor:not-allowed;}
+.dash-rbx-status{margin-top:10px;font-size:12px;color:var(--muted);min-height:18px;}
+.dash-rbx-status.ok{color:var(--ok);}
+.dash-rbx-status.err{color:var(--bad);}
+
+/* Quick start guide */
+.dash-guide{margin-top:20px;}
+.dash-guide h4{margin:0 0 14px;font-size:15px;font-weight:700;color:var(--ink);}
+.dash-steps{display:flex;flex-direction:column;gap:12px;}
+.dash-step{display:flex;align-items:flex-start;gap:12px;}
+.dash-step-num{width:24px;height:24px;border-radius:50%;background:var(--accent);color:var(--bg2);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0;margin-top:1px;}
+.dash-step-text{font-size:13px;color:var(--muted);line-height:1.5;padding-top:2px;}
+.dash-step-text b{color:var(--ink);font-weight:600;}
+
+/* Quick launch / random game */
+.dash-launch{display:flex;flex-direction:column;}
+.dash-launch-area{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:220px;border:1px solid var(--rule);border-radius:18px;background:linear-gradient(135deg,rgba(32,58,51,0.06),rgba(111,77,45,0.06));position:relative;overflow:hidden;}
+.dash-launch-icon{width:56px;height:56px;border-radius:50%;background:var(--accent2);color:var(--bg2);display:flex;align-items:center;justify-content:center;margin-bottom:14px;box-shadow:0 8px 28px rgba(32,58,51,0.25);}
+.dash-launch-icon svg{width:26px;height:26px;display:block;}
+.dash-launch-title{font-size:18px;font-weight:700;color:var(--ink);margin-bottom:6px;}
+.dash-launch-info{font-size:13px;color:var(--muted);display:flex;align-items:center;gap:6px;margin-bottom:18px;}
+.dash-launch-info .live-dot{width:7px;height:7px;border-radius:50%;background:var(--ok);box-shadow:0 0 6px rgba(45,111,82,0.5);}
+.dash-launch-btn{border:0;border-radius:14px;padding:12px 32px;font-weight:700;font-size:15px;color:var(--accent);background:transparent;cursor:pointer;transition:all var(--speed) var(--ease);display:flex;align-items:center;gap:8px;}
+.dash-launch-btn svg{width:16px;height:16px;}
+.dash-launch-btn:hover{background:rgba(111,77,45,0.1);transform:translateY(-1px);}
+.dash-launch-btn:disabled{opacity:0.5;cursor:not-allowed;transform:none;}
+
+/* Bottom nav cards */
+.dash-nav{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;}
+.dash-nav-card{display:flex;flex-direction:column;gap:10px;border:1px solid var(--rule);border-radius:var(--radius);padding:22px;background:rgba(255,250,241,0.7);box-shadow:0 18px 60px rgba(33,26,16,0.07);backdrop-filter:blur(10px);cursor:pointer;text-decoration:none;color:inherit;transition:transform var(--speed) var(--ease),box-shadow var(--speed) var(--ease),border-color var(--speed) var(--ease);}
+.dash-nav-card:hover{transform:translateY(-3px);box-shadow:0 24px 70px rgba(33,26,16,0.12);border-color:var(--accent);}
+.dash-nav-icon{width:40px;height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center;}
+.dash-nav-icon svg{width:22px;height:22px;display:block;}
+.dash-nav-icon.game{background:rgba(32,58,51,0.12);color:var(--accent2);}
+.dash-nav-icon.exec{background:rgba(111,77,45,0.12);color:var(--accent);}
+.dash-nav-icon.script{background:rgba(138,45,45,0.1);color:var(--bad);}
+.dash-nav-card b{font-size:16px;color:var(--ink);font-weight:700;}
+.dash-nav-card span{font-size:13px;color:var(--muted);}
+
 @media(max-width:900px){
-  .dash-grid{grid-template-columns:1fr}
-  .dash-bottom-row{grid-template-columns:1fr}
+  .dash-metrics{grid-template-columns:1fr;}
+  .dash-main{grid-template-columns:1fr;}
+  .dash-nav{grid-template-columns:1fr;}
+  .dash-metric-value{font-size:36px;}
 }
 </style>
 </head>
@@ -86,50 +126,115 @@
 </div>
 </div>
 
-<div class="dash-grid">
-<!-- 左边：白名单更改 + 最近登录 -->
-<div class="dash-col-left">
-<!-- 最近白名单更改 -->
-<div class="dash-card">
-<div class="dash-card-head">
-<div>
-<span class="eyebrow" data-i18n="dash.whitelist_eyebrow">Whitelist</span>
-<h3 data-i18n="dash.whitelist_title">最近白名单更改</h3>
-</div>
-</div>
-<div id="dashWhitelistList" class="dash-list">
-<div class="dash-empty" data-i18n="dash.loading">加载中...</div>
-</div>
+<!-- 顶部统计卡片 -->
+<div class="dash-metrics">
+  <div class="dash-metric">
+    <div class="dash-metric-head">
+      <div class="dash-metric-icon game">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="4"/><line x1="7" y1="12" x2="11" y2="12"/><line x1="9" y1="10" x2="9" y2="14"/><circle cx="16" cy="11" r="1" fill="currentColor"/><circle cx="18" cy="13" r="1" fill="currentColor"/></svg>
+      </div>
+      <span>现场比赛</span>
+    </div>
+    <div class="dash-metric-value" id="metricGames">--</div>
+    <div class="dash-metric-foot"><a href="./game.html">查看所有 &rarr;</a></div>
+  </div>
+  <div class="dash-metric">
+    <div class="dash-metric-head">
+      <div class="dash-metric-icon players">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      </div>
+      <span>总玩家数</span>
+    </div>
+    <div class="dash-metric-value" id="metricPlayers">--</div>
+    <div class="dash-metric-foot"><span class="live-dot"></span>现场</div>
+  </div>
+  <div class="dash-metric">
+    <div class="dash-metric-head">
+      <div class="dash-metric-icon exec">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+      </div>
+      <span>已执行的副本</span>
+    </div>
+    <div class="dash-metric-value" id="metricExecs">--</div>
+    <div class="dash-metric-foot">历时</div>
+  </div>
 </div>
 
-<!-- 最近登录状态 -->
-<div class="dash-card">
-<div class="dash-card-head">
-<div>
-<span class="eyebrow" data-i18n="dash.login_eyebrow">Activity</span>
-<h3 data-i18n="dash.login_title">最近登录状态</h3>
-</div>
-</div>
-<div id="dashLoginList" class="dash-list">
-<div class="dash-empty" data-i18n="dash.loading">加载中...</div>
-</div>
-</div>
+<!-- 中间主内容区 -->
+<div class="dash-main">
+  <!-- 左栏：设置用户名 + 快速入门 -->
+  <div class="dash-card">
+    <h3>设置你的 Roblox 用户名</h3>
+    <p class="dash-card-sub">将你的 Roblox 账户与 Andrux 绑定，实现无缝集成。</p>
+    <div class="dash-rbx-row">
+      <input type="text" class="dash-rbx-input" id="dashRbxInput" placeholder="输入 Roblox 用户名" maxlength="20">
+      <button class="dash-rbx-btn" id="dashRbxBtn">设定账户</button>
+    </div>
+    <div class="dash-rbx-status" id="dashRbxStatus"></div>
+
+    <div class="dash-guide">
+      <h4>快速入门指南</h4>
+      <div class="dash-steps">
+        <div class="dash-step">
+          <div class="dash-step-num">1</div>
+          <div class="dash-step-text"><b>请在上面设置你的 Roblox 用户名</b></div>
+        </div>
+        <div class="dash-step">
+          <div class="dash-step-num">2</div>
+          <div class="dash-step-text"><b>从游戏页面加入游戏</b></div>
+        </div>
+        <div class="dash-step">
+          <div class="dash-step-num">3</div>
+          <div class="dash-step-text"><b>打开执行器，运行你的第一个脚本</b></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 右栏：快速发射 -->
+  <div class="dash-card dash-launch">
+    <h3>快速发射</h3>
+    <p class="dash-card-sub">热门游戏</p>
+    <div class="dash-launch-area">
+      <div class="dash-launch-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
+      </div>
+      <div class="dash-launch-title">加入随机热门游戏</div>
+      <div class="dash-launch-info">
+        <span class="live-dot"></span>
+        <span id="launchOnlineInfo">正在加载在线游戏...</span>
+      </div>
+      <button class="dash-launch-btn" id="dashLaunchBtn">
+        发射
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+      </button>
+    </div>
+  </div>
 </div>
 
-<!-- 右边：游戏状态 -->
-<div class="dash-col-right">
-<div class="dash-card">
-<div class="dash-card-head">
-<div>
-<span class="eyebrow" data-i18n="dash.game_eyebrow">Game</span>
-<h3 data-i18n="dash.game_title">当前游戏状态</h3>
-</div>
-</div>
-<div id="dashGameList">
-<div class="dash-empty" data-i18n="dash.loading">加载中...</div>
-</div>
-</div>
-</div>
+<!-- 底部导航卡片 -->
+<div class="dash-nav">
+  <a class="dash-nav-card" href="./game.html">
+    <div class="dash-nav-icon game">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="4"/><line x1="7" y1="12" x2="11" y2="12"/><line x1="9" y1="10" x2="9" y2="14"/><circle cx="16" cy="11" r="1" fill="currentColor"/><circle cx="18" cy="13" r="1" fill="currentColor"/></svg>
+    </div>
+    <b>游戏</b>
+    <span>浏览可用游戏</span>
+  </a>
+  <a class="dash-nav-card" href="./executor.html">
+    <div class="dash-nav-icon exec">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+    </div>
+    <b>执行人</b>
+    <span>运行 Lua 脚本</span>
+  </a>
+  <a class="dash-nav-card" href="./scripthub.html">
+    <div class="dash-nav-icon script">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+    </div>
+    <b>剧本</b>
+    <span>你的脚本中心</span>
+  </a>
 </div>
 
 </section>
