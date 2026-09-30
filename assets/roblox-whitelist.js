@@ -52,11 +52,13 @@ toast._t=setTimeout(function(){el.classList.remove('show');},2500);
 }
 
 function rpc(fn,body){
-return fetch(SU+'/rest/v1/rpc/'+fn,{
+var timer;
+var timeout=new Promise(function(_,rej){timer=setTimeout(function(){rej(new Error('请求超时'));},8000);});
+return Promise.race([fetch(SU+'/rest/v1/rpc/'+fn,{
 method:'POST',
 headers:{apikey:SK,Authorization:'Bearer '+SK,'Content-Type':'application/json'},
 body:JSON.stringify(body)
-}).then(function(r){
+}),timeout]).then(function(r){clearTimeout(timer);
 if(!r.ok)return r.text().then(function(t){
 var msg='HTTP '+r.status;
 try{var j=JSON.parse(t);if(j.message)msg=j.message;}catch(e){}
@@ -277,6 +279,9 @@ rpc('ax_unbind_roblox',{p_username:user,p_roblox_name:robloxName})
 .then(function(res){
 if(res&&res.ok){
 _lastSig=null;
+try{var lc=String(robloxName).toLowerCase();var cache=JSON.parse(localStorage.getItem('andrux_rbx_whitelist')||'[]');
+localStorage.setItem('andrux_rbx_whitelist',JSON.stringify(cache.filter(function(x){return String(x.username||x.name||'').toLowerCase()!==lc;})));}catch(e){}
+bindings=bindings.filter(function(b){return String(b.roblox_name).toLowerCase()!==String(robloxName).toLowerCase();});
 toast(t('rbx.unbinded')+robloxName);
 loadBindings();
 }else{toast(t('rbx.unbind_fail'));}

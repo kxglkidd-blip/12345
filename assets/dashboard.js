@@ -39,8 +39,17 @@ function getSession(){
   return null;
 }
 
+/* 带超时的 fetch：超时则 abort 并 reject，绝不让流程挂起 */
+function fetchT(url,opts,ms){
+  ms=ms||8000;opts=opts||{};
+  var ctrl=null;try{ctrl=new AbortController();opts.signal=ctrl.signal;}catch(e){}
+  var timer;
+  var timeout=new Promise(function(_,rej){timer=setTimeout(function(){rej(new Error('请求超时，请检查网络后重试'));try{ctrl&&ctrl.abort();}catch(e){}},ms);});
+  return Promise.race([fetch(url,opts),timeout]).then(function(r){clearTimeout(timer);return r;},function(e){clearTimeout(timer);if(e&&(e.name==='AbortError'||/abort/i.test(e.message||'')))throw new Error('请求超时，请检查网络后重试');if(e&&e.name==='TypeError')throw new Error('网络连接失败，请检查网络后重试');throw e;});
+}
+
 function rpc(fn,body){
-  return fetch(SU+'/rest/v1/rpc/'+fn,{
+  return fetchT(SU+'/rest/v1/rpc/'+fn,{
     method:'POST',
     headers:{apikey:SK,Authorization:'Bearer '+SK,'Content-Type':'application/json'},
     body:JSON.stringify(body)
@@ -242,17 +251,41 @@ function joinRandomGame(){
 
 /* ===== Roblox username binding ===== */
 function resolveRobloxUserId(username){
-  return fetch(ROBLOX_API,{
+  /* 4 秒超时，失败/限流/超时一律返回 null，不阻塞绑定 */
+  return fetchT(ROBLOX_API,{
     method:'POST',
     headers:{'Content-Type':'application/json'},
     body:JSON.stringify({usernames:[username],excludeBannedUsers:false})
-  }).then(function(r){
-    if(!r.ok)throw new Error('HTTP '+r.status);
-    return r.json();
+  },4000).then(function(r){
+    if(!r.ok)return null;
+    return r.json().catch(function(){return null;});
   }).then(function(data){
     if(data&&data.data&&data.data[0]&&data.data[0].id)return data.data[0].id;
     return null;
   }).catch(function(){return null;});
+}
+
+/* 绑定前查重：只检查“输入的 Roblox 用户名”是否已存在于白名单 ax_rb（c3 = 小写用户名）
+   查询失败时不误拦，交给 ax_bind_roblox 服务端再校验 already_bound */
+function checkAlreadyBound(user,name){
+  var lower=name.trim().toLowerCase();
+  var h={apikey:SK,Authorization:'Bearer '+SK};
+  function q(path){
+    return fetchT(SU+'/rest/v1/ax_rb?'+path,{headers:h,cache:'no-store'},5000)
+      .then(function(r){return r.ok?r.json():[];})
+      .then(function(j){return Array.isArray(j)&&j.length>0;})
+      .catch(function(){return false;});
+  }
+  return Promise.all([
+    q('select=c0&c3=eq.'+encodeURIComponent(lower)+'&limit=1'),
+    q('select=c0&c2=ilike.'+encodeURIComponent(lower.replace(/[%_*]/g,''))+'&limit=1')
+  ]).then(function(r){return r[0]||r[1];}).catch(function(){return false;});
+}
+/* 每个用户最多 5 个绑定 */
+function countMyBindings(user){
+  return rpc('ax_list_roblox',{p_username:user}).then(function(res){
+    return (res&&res.ok)?(res.bindings||[]).length:0;
+  }).catch(function(){return 0;});
 }
 
 function bindRobloxUsername(){
@@ -276,11 +309,24 @@ function bindRobloxUsername(){
     return;
   }
 
+  var origLabel=btn.getAttribute('data-orig-label')||btn.textContent||'绑定账户';
+  btn.setAttribute('data-orig-label',origLabel);
   btn.disabled=true;
   btn.textContent='绑定中...';
   if(status){status.textContent='正在验证用户名...';status.className='dash-rbx-status';}
 
-  resolveRobloxUserId(name).then(function(uid){
+  /* 兜底：20 秒内无论如何恢复按钮 */
+  var guard=setTimeout(function(){
+    btn.disabled=false;btn.textContent=origLabel;
+    if(status&&/正在(验证|绑定)/.test(status.textContent)){status.textContent='绑定超时，请稍后重试';status.className='dash-rbx-status err';}
+  },20000);
+  var DUP_MSG='该 Roblox 账号已在白名单中绑定过，请先前往白名单页面解绑后再重新绑定';
+  Promise.all([checkAlreadyBound(user,name),countMyBindings(user)]).then(function(r){
+    if(r[0]){var e=new Error(DUP_MSG);e.dup=true;throw e;}
+    if(r[1]>=5){var e2=new Error('已绑定5个账号，请先前往白名单页面解绑');e2.dup=true;throw e2;}
+    return resolveRobloxUserId(name);
+  }).then(function(uid){
+    if(status){status.textContent='正在绑定...';status.className='dash-rbx-status';}
     return rpc('ax_bind_roblox',{
       p_username:user,
       p_roblox_name:name,
@@ -291,20 +337,23 @@ function bindRobloxUsername(){
       if(status){status.textContent='已绑定: '+name;status.className='dash-rbx-status ok';}
       toast('已绑定: '+name);
       input.value='';
-      loadWhitelistBindings();
+      try{loadWhitelistBindings();}catch(_){}
     }else{
       var err=res?res.error:'unknown';
       var msg='绑定失败';
       if(err==='limit_reached')msg='已绑定5个账号，请先解绑';
-      else if(err==='already_bound')msg='已绑定过此用户名';
+      else if(err==='already_bound')msg='该 Roblox 账号已在白名单中绑定过，请先前往白名单页面解绑后再重新绑定';
       else msg='绑定失败: '+err;
       if(status){status.textContent=msg;status.className='dash-rbx-status err';}
     }
   }).catch(function(e){
-    if(status){status.textContent='绑定失败: '+(e.message||e);status.className='dash-rbx-status err';}
+    if(e&&e.dup){if(status){status.textContent=e.message;status.className='dash-rbx-status err';}try{alert(e.message);}catch(_){}return;}
+    var m=(e&&e.message)?e.message:String(e||'未知错误');
+    if(status){status.textContent='绑定失败: '+m;status.className='dash-rbx-status err';}
   }).then(function(){
+    clearTimeout(guard);
     btn.disabled=false;
-    btn.textContent='设定账户';
+    btn.textContent=origLabel;
   });
 }
 
@@ -382,13 +431,15 @@ setTimeout(init,2000);
 // Same-tab live update when a script is pushed
 window.addEventListener('andrux_exec_logged',function(e){
   var n=e&&e.detail&&e.detail.total;
-  if(n&&n>execCount){execCount=n;renderMetrics();}
+  if(n!=null){execCount=Math.max(execCount,parseInt(n,10)||0);renderMetrics();}
 });
 
 // React to storage changes from other tabs
 window.addEventListener('storage',function(e){
-  if(e.key==='andrux_game_list'||e.key==='andrux_total_execs'){
-    refreshAll();
+  if(e.key==='andrux_game_list')refreshAll();
+  if(e.key==='andrux_total_execs'){
+    execCount=Math.max(execCount,parseInt(e.newValue||'0',10)||0);
+    renderMetrics();
   }
   if(e.key==='andrux_lang'){
     setTimeout(function(){applyI18n();},50);
