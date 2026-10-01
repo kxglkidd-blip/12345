@@ -4,7 +4,27 @@
 
 var SU='https://nyourvnfzhxbofwmavgq.supabase.co';
 var SK='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im55b3Vydm5memh4Ym9md21hdmdxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUwOTYwMTIsImV4cCI6MjEwMDY3MjAxMn0.YqztdjSz8kDAf9sHpqVeiMLjfwSbl4kvc8O5sGyJkvg';
-var ROBLOX_API='https://users.roproxy.com/v1/usernames/users';
+/* Roblox's own APIs send no Access-Control-Allow-Origin, so they only work in the desktop
+   build, where the request is routed through the main process. In a plain browser the lookup
+   has to go through a CORS-enabled mirror: roproxy's user service is down, so ff-roproxy and
+   rotunnel carry the username lookup, and roproxy still serves the thumbnails route. */
+var USER_ID_APIS=[
+'https://users.roblox.com/v1/usernames/users',
+'https://users.ff-roproxy.com/v1/usernames/users',
+'https://users.rotunnel.com/v1/usernames/users'
+];
+var USER_SEARCH_APIS=[
+'https://users.ff-roproxy.com/v1/users/search',
+'https://users.rotunnel.com/v1/users/search'
+];
+var THUMB_DIRECT=[
+'https://thumbnails.roblox.com/v1/users/avatar-headshot'
+];
+var THUMB_CORS=[
+'https://thumbnails.roproxy.com/v1/users/avatar-headshot',
+'https://thumbnails.ff-roproxy.com/v1/users/avatar-headshot',
+'https://thumbnails.rotunnel.com/v1/users/avatar-headshot'
+];
 
 function $(id){return document.getElementById(id);}
 
@@ -68,33 +88,142 @@ return r.json();
 });
 }
 
+/* Username -> id and id -> headshot both go through a small endpoint list; each call has a
+   hard timeout, retries once, and the result is cached (memory + localStorage). */
+function withTimeout(promise,ms){
+return new Promise(function(res,rej){
+var timer=setTimeout(function(){rej(new Error('timeout'));},ms);
+promise.then(function(v){clearTimeout(timer);res(v);},function(e){clearTimeout(timer);rej(e);});
+});
+}
+
+function withRetry(fn,times){
+return fn().catch(function(e){
+if(times<=1)throw e;
+return new Promise(function(res){setTimeout(res,900);}).then(function(){return withRetry(fn,times-1);});
+});
+}
+
+/* Roblox's public APIs send no CORS headers, so a fetch() from a file:// renderer page is
+   blocked by the browser. In the desktop build we route these lookups through the main
+   process (which has no CORS); the plain fetch path stays as a fallback for web/Android.
+   roproxy is a caching proxy: its first hit on a cold key can take tens of seconds (or
+   briefly answer 520), but once warm it replies in well under a second, so the timeout is
+   deliberately generous and the caller retries. */
+function rbxJson(url,opts,ms){
+ms=ms||15000;
+var d=window.andruxDesktop;
+if(d&&typeof d.robloxJson==='function'){
+var o=opts||{};
+o.timeout=ms;
+return withTimeout(d.robloxJson(url,o),ms);
+}
+return withTimeout(fetch(url,opts),ms).then(function(r){
+if(!r.ok)throw new Error('HTTP '+r.status);
+return r.json();
+});
+}
+
+function loadCache(key){
+try{return JSON.parse(localStorage.getItem(key)||'{}')||{};}catch(e){return{};}
+}
+function saveCache(key,obj){
+try{localStorage.setItem(key,JSON.stringify(obj));}catch(e){}
+}
+
+/* v3 keys: the older caches could hold a url from the retired headshot endpoint (renders as a
+   broken image forever), and the id-resolution strategy has changed, so start clean. */
+var _uidCache=loadCache('andrux_rbx_uid_cache_v3');
+var _avatarCache=loadCache('andrux_rbx_avatar_cache_v3');
+
+/* Fallback used when the official lookup is unreachable (i.e. the website build, where the
+   renderer has no main-process proxy). Search returns fuzzy matches, so require an exact
+   name match to avoid binding the wrong account. */
+function searchRobloxUserId(username){
+var key=String(username).toLowerCase();
+function attempt(i){
+return rbxJson(USER_SEARCH_APIS[i]+'?keyword='+encodeURIComponent(username)+'&limit=10',{
+headers:{Accept:'application/json'}
+},8000).then(function(data){
+var list=(data&&data.data)||[];
+for(var k=0;k<list.length;k++){
+if(String(list[k].name||'').toLowerCase()===key)return list[k].id;
+}
+throw new Error('not found');
+}).catch(function(e){
+if(i+1<USER_SEARCH_APIS.length)return attempt(i+1);
+throw e;
+});
+}
+return attempt(0);
+}
+
+/* Only the desktop build can reach Roblox directly (through the main process); a plain
+   browser renderer has no CORS exemption, so it must use the CORS-enabled search endpoint. */
+function hasDesktopProxy(){
+return !!(window.andruxDesktop&&typeof window.andruxDesktop.robloxJson==='function');
+}
+
 function resolveRobloxUserId(username){
-return fetch(ROBLOX_API,{
+if(!username)return Promise.resolve(null);
+var key=String(username).toLowerCase();
+if(_uidCache[key])return Promise.resolve(_uidCache[key]);
+/* POST usernames/users is an exact lookup, so it is tried before the fuzzy search. A plain
+   browser starts at index 1 because Roblox's own host sends no CORS header there and that
+   call can only ever fail. */
+function postAt(i){
+if(i>=USER_ID_APIS.length)return Promise.reject(new Error('not found'));
+return rbxJson(USER_ID_APIS[i],{
 method:'POST',
 headers:{'Content-Type':'application/json'},
 body:JSON.stringify({usernames:[username],excludeBannedUsers:false})
-}).then(function(r){
-if(!r.ok)throw new Error('HTTP '+r.status);
-return r.json();
-}).then(function(data){
-if(data&&data.data&&data.data[0]&&data.data[0].id)return data.data[0].id;
-return null;
+},8000).then(function(data){
+var id=data&&data.data&&data.data[0]&&data.data[0].id;
+if(id)return id;
+throw new Error('not found');
+}).catch(function(){return postAt(i+1);});
+}
+return postAt(hasDesktopProxy()?0:1).catch(function(){return searchRobloxUserId(username);}).then(function(id){
+if(!id)throw new Error('not found');
+_uidCache[key]=id;saveCache('andrux_rbx_uid_cache_v3',_uidCache);
+return id;
 }).catch(function(){return null;});
 }
 
-function getAvatarUrl(userId){
-if(!userId)return null;
-return'https://www.roblox.com/headshot-thumbnail/image?userId='+userId+'&width=150&height=150&format=png';
+/* Roblox's legacy www.roblox.com/headshot-thumbnail endpoint no longer serves images;
+   the thumbnails API returns the real CDN url (tr.rbxcdn.com) instead. */
+function fetchAvatarUrl(userId){
+if(!userId)return Promise.resolve(null);
+var key=String(userId);
+if(_avatarCache[key])return Promise.resolve(_avatarCache[key]);
+/* Try whichever host is actually reachable first: Roblox directly only works with the
+   main-process proxy, roproxy is the one that carries CORS headers. */
+var apis=hasDesktopProxy()?THUMB_DIRECT.concat(THUMB_CORS):THUMB_CORS.concat(THUMB_DIRECT);
+function attempt(i){
+return rbxJson(apis[i]+'?userIds='+encodeURIComponent(key)+'&size=150x150&format=Png&isCircular=true',{
+headers:{Accept:'application/json'}
+}).then(function(data){
+var item=data&&data.data&&data.data[0];
+if(item&&item.imageUrl)return item.imageUrl;
+throw new Error('pending');
+}).catch(function(e){
+if(i+1<apis.length)return attempt(i+1);
+throw e;
+});
+}
+return withRetry(function(){return attempt(0);},2).then(function(url){
+_avatarCache[key]=url;saveCache('andrux_rbx_avatar_cache_v3',_avatarCache);
+return url;
+}).catch(function(){return null;});
 }
 
 function avatarHtml(name,userId){
-var url=getAvatarUrl(userId);
-var initial=name.charAt(0).toUpperCase();
-var fallback='<div class="wl-avatar-fallback">'+initial+'</div>';
-if(url){
-return'<img src="'+url+'" class="wl-avatar" alt="'+name+'" data-initial="'+initial+'" style="display:none"/>';
-}
-return fallback;
+var initial=(name||'?').charAt(0).toUpperCase();
+/* The initial shows immediately; the real headshot fades in over it once it loads. */
+return'<span class="wl-avatar-slot">'+
+'<span class="wl-avatar-fallback">'+initial+'</span>'+
+'<img class="wl-avatar" alt="'+name+'" data-roblox-name="'+name+'" data-user-id="'+(userId||'')+'" style="display:none"/>'+
+'</span>';
 }
 
 function setupAvatarImages(){
@@ -102,26 +231,37 @@ var imgs=document.querySelectorAll('#wlAccountArea .wl-avatar');
 imgs.forEach(function(img){
 if(img._wlBound)return;
 img._wlBound=true;
-function showFallback(){
-var fb=document.createElement('div');
-fb.className='wl-avatar-fallback';
-fb.textContent=img.getAttribute('data-initial')||'?';
-if(img.parentNode)img.parentNode.replaceChild(fb,img);
-}
 img.addEventListener('load',function(){
 img.style.display='';
+var fb=img.parentNode?img.parentNode.querySelector('.wl-avatar-fallback'):null;
+if(fb)fb.style.display='none';
 });
+/* A cached but dead CDN url must not block the avatar forever: drop it and re-resolve once. */
 img.addEventListener('error',function(){
-showFallback();
+if(img._wlRetried)return;
+img._wlRetried=true;
+var dead=img.getAttribute('data-user-id')||'';
+if(dead&&_avatarCache[dead]){delete _avatarCache[dead];saveCache('andrux_rbx_avatar_cache_v3',_avatarCache);}
+var name2=img.getAttribute('data-roblox-name')||'';
+var again=dead?Promise.resolve(dead):resolveRobloxUserId(name2);
+again.then(function(id){
+if(!id)return;
+return fetchAvatarUrl(id).then(function(url){
+if(url&&img.parentNode)img.src=url;
 });
-// If image is already cached and loaded
-if(img.complete){
-if(img.naturalWidth>0){
-img.style.display='';
-}else{
-showFallback();
-}
-}
+});
+});
+/* Prefer the id stored in the DB, but fall back to resolving it from the username so
+   the avatar still shows when the stored id is missing. */
+var uid=img.getAttribute('data-user-id');
+var name=img.getAttribute('data-roblox-name')||'';
+var getId=uid?Promise.resolve(uid):resolveRobloxUserId(name);
+getId.then(function(id){
+if(!id)return;
+return fetchAvatarUrl(id).then(function(url){
+if(url&&img.parentNode)img.src=url;
+});
+});
 });
 }
 

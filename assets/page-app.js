@@ -1205,10 +1205,12 @@ toast(t('toast.lang_updated'));
 }
 
 /* ===== Game page ===== */
+/* Server sends a heartbeat roughly every 30s; if none arrives within this window the game is offline. */
+var HEARTBEAT_STALE_MS=40000;
 function initGame(){
 if(!requireSession())return;
 loadGameStatus();
-gameTimer=setInterval(loadGameStatus,10000);
+gameTimer=setInterval(loadGameStatus,5000);
 }
 
 function loadGameStatus(){
@@ -1217,18 +1219,18 @@ api(T_GAMES,'?select=*&hidden=eq.false&order=last_heartbeat.desc&limit=50').then
 if(!rows||!rows.length){box.innerHTML='<div class="notice">'+t('game.no_data')+'</div>';return;}
 var now=Date.now();
 box.innerHTML='<div class="games-grid">'+rows.map(function(g){
-var isOnline=g.status==='online'&&(now-new Date(g.last_heartbeat).getTime())<60000;
+var isOnline=g.status==='online'&&(now-new Date(g.last_heartbeat).getTime())<HEARTBEAT_STALE_MS;
 var cls=isOnline?'gc gc-has-bg':'gc gc-has-bg gc-offline';
 var hasBg=g.cover_image_url&&g.cover_image_url.length>5;
 var safeBg=safeURL(g.cover_image_url);
 if(!hasBg||!safeBg)cls=cls.replace('gc-has-bg','gc-no-bg');
-var bgStyle=(hasBg&&safeBg)?"background-image:url('"+safeBg.replace(/'/g,'')+"')":'';
+var bgStyle=(hasBg&&safeBg)?"background-image:url('"+safeBg.replace(/'/g,'')+"');background-size:cover;background-position:center;background-repeat:no-repeat;":'';
 var rawJoin=g.join_url||('roblox://placeId='+g.place_id);
 var joinHref=safeURL(rawJoin)||('roblox://placeId='+escapeAttr(g.place_id));
 var joinDisabled=isOnline?'':'pointer-events:none;opacity:0.4;';
 var statusHtml=isOnline?'<span class="gc-status gc-online">'+t('game.online')+'</span>':'<span class="gc-status gc-offline">'+t('game.offline')+'</span>';
-return '<div class="'+cls+'" style="'+bgStyle+'">'+
-'<div class="gc-bg"></div>'+
+return '<div class="'+cls+'">'+
+'<div class="gc-bg" style="'+bgStyle+'"></div>'+
 '<div class="gc-ov"></div>'+
 '<div class="gc-body">'+
 '<div class="gc-top-row">'+statusHtml+'</div>'+
@@ -1247,6 +1249,11 @@ return '<div class="'+cls+'" style="'+bgStyle+'">'+
 
 /* ===== Executor ===== */
 var execSelectedPlaceId=null;
+var execGameTimer=null;
+function startExecGameRefresh(){
+if(execGameTimer)return;
+execGameTimer=setInterval(loadExecGames,5000);
+}
 function initExecutor(){
 if(!requireSession())return;
 var lock=$('execLock');
@@ -1255,7 +1262,7 @@ var form=$('execLoginForm');
 if(!lock||!panel||!form)return;
 
 if(sessionStorage.getItem('andrux_admin_ok')==='1'){
-lock.classList.add('hidden');panel.classList.remove('hidden');loadExecGames();
+lock.classList.add('hidden');panel.classList.remove('hidden');loadExecGames();startExecGameRefresh();
 }
 
 form.addEventListener('submit',function(e){
@@ -1265,7 +1272,7 @@ hashText(pw.toLowerCase()).then(function(hash){
 if(hash===getAdminHash()){
 sessionStorage.setItem('andrux_admin_ok','1');
 lock.classList.add('hidden');panel.classList.remove('hidden');
-toast(t('toast.password_ok'));loadExecGames();
+toast(t('toast.password_ok'));loadExecGames();startExecGameRefresh();
 }else{setNotice($('execNotice'),t('toast.password_err'),'bad');}
 });
 });
@@ -1292,7 +1299,7 @@ api(T_GAMES,'?select=place_id,game_name,status,last_heartbeat,player_count&hidde
 if(!rows||!rows.length){container.innerHTML='<div class="notice">'+t('exec.no_games')+'</div>';return;}
 var now=Date.now();
 container.innerHTML=rows.map(function(g){
-var isOnline=g.status==='online'&&(now-new Date(g.last_heartbeat).getTime())<60000;
+var isOnline=g.status==='online'&&(now-new Date(g.last_heartbeat).getTime())<HEARTBEAT_STALE_MS;
 var cls=isOnline?'exec-game-item':'exec-game-item offline';
 if(g.place_id===execSelectedPlaceId)cls+=' selected';
 var statusHtml=isOnline?'<span class="exec-game-status online">'+t('game.online')+'</span>':'<span class="exec-game-status offline">'+t('game.offline')+'</span>';
@@ -1312,19 +1319,6 @@ execSelectedPlaceId=el.dataset.placeId;
 }).catch(function(){container.innerHTML='<div class="notice bad">'+t('admin.load_fail')+'</div>';});
 }
 
-/* Lua 执行计数：推送成功后写 ax_exec_log 并递增本地计数 */
-function logLuaExec(placeId){
-var oldV='0',next=1;
-try{oldV=localStorage.getItem('andrux_total_execs')||'0';next=(parseInt(oldV,10)||0)+1;localStorage.setItem('andrux_total_execs',String(next));}catch(e){}
-try{window.dispatchEvent(new StorageEvent('storage',{key:'andrux_total_execs',oldValue:oldV,newValue:String(next),storageArea:localStorage}));}catch(e){}
-try{window.dispatchEvent(new CustomEvent('andrux_exec_logged',{detail:{total:next}}));}catch(e){}
-var rn='';try{rn=(session&&(session.roblox_name||session.username))||'';}catch(e){}
-try{
-fetch(SU+'/rest/v1/ax_exec_log',{method:'POST',headers:{apikey:SK,Authorization:'Bearer '+SK,'Content-Type':'application/json',Prefer:'return=minimal'},
-body:JSON.stringify({place_id:String(placeId||''),source:'executor_lua',roblox_name:rn})}).catch(function(err){console.warn('exec log failed',err);});
-}catch(e){}
-}
-
 function execSendScript(){
 var editor=$('execScriptInput');
 var status=$('execStatus');
@@ -1340,13 +1334,23 @@ var payload={exec_queue:[script]};
 api(T_GAMES,'?place_id=eq.'+encodeURIComponent(execSelectedPlaceId),{
 method:'PATCH',body:JSON.stringify(payload)
 }).then(function(){
+try {
+  var storedName = (window.localStorage && localStorage.getItem('andrux_bound_roblox_name')) || '';
+  rpc('ax_log_exec', {
+    p_place_id: execSelectedPlaceId,
+    p_source: 'executor_lua',
+    p_roblox_name: storedName
+  }).catch(function(){});
+  var cur = parseInt(localStorage.getItem('andrux_total_execs') || '0', 10);
+  localStorage.setItem('andrux_total_execs', String(cur + 1));
+  window.dispatchEvent(new Event('storage'));
+} catch(e) {}
 setNotice(status,t('misc.script_pushed')+execSelectedPlaceId+t('misc.push_wait'),'ok');
 toast(t('toast.script_pushed'));
-logLuaExec(execSelectedPlaceId);
 }).catch(function(err){
 setNotice(status,t('misc.push_fail')+(err.message||t('misc.unknown_err')),'bad');
 }).finally(function(){
-if(sendBtn){sendBtn.disabled=false;sendBtn.textContent=t('exec.push');sendBtn.style.opacity='';}
+if(sendBtn){sendBtn.disabled=false;sendBtn.textContent=t('exec.execute');sendBtn.style.opacity='';}
 });
 }
 

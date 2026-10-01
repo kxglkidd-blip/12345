@@ -63,10 +63,19 @@ function hideOffline(){
   try{return localStorage.getItem('andrux_hide_offline')==='1';}catch(e){return false;}
 }
 
+var SERVER_STALE_MS=40000; /* server heartbeats ~every 30s; no beat within 40s = offline */
+function serverAlive(r){
+if(!r||r.status!=='online')return false;
+if(!r.last_heartbeat)return false;
+var hb=new Date(r.last_heartbeat).getTime();
+if(isNaN(hb))return false;
+return (Date.now()-hb)<=SERVER_STALE_MS;
+}
+
 function loadServers(){
 var sel=$('shServerSelect');
 if(!sel)return;
-apiGet(TABLE+'?select=place_id,game_name,player_count,status&hidden=eq.false&order=game_name.asc')
+apiGet(TABLE+'?select=place_id,game_name,player_count,status,last_heartbeat&hidden=eq.false&order=game_name.asc')
 .then(function(rows){
 if(!rows||!rows.length){
 sel.innerHTML='<option value="">'+tt('sh.no_servers')+'</option>';
@@ -74,7 +83,7 @@ return;
 }
 var hideOff=hideOffline();
 var filtered=rows.filter(function(r){
-  if(hideOff&&r.status!=='online')return false;
+  if(hideOff&&!serverAlive(r))return false;
   return true;
 });
 if(!filtered.length){
@@ -82,10 +91,11 @@ sel.innerHTML='<option value="">'+(hideOff?tt('sh.no_online'):tt('sh.no_servers'
 return;
 }
 sel.innerHTML=filtered.map(function(r){
+var alive=serverAlive(r);
 var name=r.game_name||r.place_id;
-var pc=(r.status==='online')?(r.player_count||0):0;
-var statusTag=(r.status==='online')?'':' ['+(tt('sh.offline')||'离线')+']';
-return'<option value="'+r.place_id+'"'+(r.status==='online'?'':' data-offline="1"')+'>'+name+statusTag+' ('+pc+')</option>';
+var pc=alive?(r.player_count||0):0;
+var statusTag=alive?'':' ['+(tt('sh.offline')||'离线')+']';
+return'<option value="'+r.place_id+'"'+(alive?'':' data-offline="1"')+'>'+name+statusTag+' ('+pc+')</option>';
 }).join('');
 })
 .catch(function(){sel.innerHTML='<option value="">'+tt('sh.load_fail')+'</option>';});
@@ -309,6 +319,7 @@ function init(){
 loadServers();
 setupTabs();
 applyI18n();
+if(!window._shServerInterval){window._shServerInterval=setInterval(loadServers,5000);}
 }
 
 if(document.readyState==='loading'){

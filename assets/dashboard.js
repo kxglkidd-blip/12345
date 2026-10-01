@@ -10,7 +10,18 @@
 
 var SU='https://nyourvnfzhxbofwmavgq.supabase.co';
 var SK='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im55b3Vydm5memh4Ym9md21hdmdxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUwOTYwMTIsImV4cCI6MjEwMDY3MjAxMn0.YqztdjSz8kDAf9sHpqVeiMLjfwSbl4kvc8O5sGyJkvg';
-var ROBLOX_API='https://users.roproxy.com/v1/usernames/users';
+/* Roblox's own host sends no CORS header, so it is only reachable from the desktop build
+   (main-process proxy). A plain browser has to use a CORS-enabled mirror; roproxy's user
+   service is down, so ff-roproxy and rotunnel carry the lookup. */
+var ROBLOX_ID_APIS=[
+'https://users.roblox.com/v1/usernames/users',
+'https://users.ff-roproxy.com/v1/usernames/users',
+'https://users.rotunnel.com/v1/usernames/users'
+];
+var ROBLOX_SEARCH_APIS=[
+'https://users.ff-roproxy.com/v1/users/search',
+'https://users.rotunnel.com/v1/users/search'
+];
 
 function $(id){return document.getElementById(id);}
 
@@ -84,8 +95,8 @@ var execCount=0;
 var _loading=false;
 
 /* ===== Load games from Supabase (BUG FIX: was reading localStorage only) ===== */
-/* Filter: status=online AND hidden=false AND heartbeat within 5 min (truly online) */
-var STALE_MS=5*60*1000; /* 5 minutes without heartbeat = offline */
+/* Filter: status=online AND hidden=false AND heartbeat fresh (truly online) */
+var STALE_MS=40000; /* server heartbeats ~every 30s; no beat within 40s = offline */
 function isGameAlive(g){
   if(!g||g.status!=='online')return false;
   if(!g.last_heartbeat)return false;
@@ -250,19 +261,51 @@ function joinRandomGame(){
 }
 
 /* ===== Roblox username binding ===== */
+/* Roblox's public APIs send no CORS headers, so a renderer fetch() from a file:// page is
+   blocked. In the desktop build these lookups go through the main process (no CORS). */
+function rbxJson(url,opts,ms){
+  var d=window.andruxDesktop;
+  if(d&&typeof d.robloxJson==='function'){
+    var timer;
+    var timeout=new Promise(function(_,rej){timer=setTimeout(function(){rej(new Error('timeout'));},ms||6000);});
+    return Promise.race([d.robloxJson(url,opts||{}),timeout]).then(function(v){clearTimeout(timer);return v;},function(e){clearTimeout(timer);throw e;});
+  }
+  return fetchT(url,opts,ms).then(function(r){
+    if(!r.ok)throw new Error('HTTP '+r.status);
+    return r.json();
+  });
+}
+
 function resolveRobloxUserId(username){
-  /* 4 秒超时，失败/限流/超时一律返回 null，不阻塞绑定 */
-  return fetchT(ROBLOX_API,{
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({usernames:[username],excludeBannedUsers:false})
-  },4000).then(function(r){
-    if(!r.ok)return null;
-    return r.json().catch(function(){return null;});
-  }).then(function(data){
-    if(data&&data.data&&data.data[0]&&data.data[0].id)return data.data[0].id;
-    return null;
-  }).catch(function(){return null;});
+  /* Failure returns null and never blocks binding. Roblox's own host sends no CORS header, so a
+     browser starts at index 1 and relies on the CORS-enabled mirrors. */
+  function postAt(i){
+    if(i>=ROBLOX_ID_APIS.length)return Promise.reject(new Error('not found'));
+    return rbxJson(ROBLOX_ID_APIS[i],{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({usernames:[username],excludeBannedUsers:false})
+    },6000).then(function(data){
+      if(data&&data.data&&data.data[0]&&data.data[0].id)return data.data[0].id;
+      throw new Error('not found');
+    }).catch(function(){return postAt(i+1);});
+  }
+  /* Search returns fuzzy matches, so require an exact name match. */
+  function searchAt(i){
+    if(i>=ROBLOX_SEARCH_APIS.length)return Promise.reject(new Error('not found'));
+    return rbxJson(ROBLOX_SEARCH_APIS[i]+'?keyword='+encodeURIComponent(username)+'&limit=10',{
+      headers:{Accept:'application/json'}
+    },6000).then(function(data){
+      var list=(data&&data.data)||[];
+      var key=String(username).toLowerCase();
+      for(var k=0;k<list.length;k++){
+        if(String(list[k].name||'').toLowerCase()===key)return list[k].id;
+      }
+      throw new Error('not found');
+    }).catch(function(){return searchAt(i+1);});
+  }
+  var direct=!!(window.andruxDesktop&&typeof window.andruxDesktop.robloxJson==='function');
+  return postAt(direct?0:1).catch(function(){return searchAt(0);}).catch(function(){return null;});
 }
 
 /* 绑定前查重：只检查“输入的 Roblox 用户名”是否已存在于白名单 ax_rb（c3 = 小写用户名）
@@ -416,9 +459,9 @@ function init(){
   prefillBoundUser();
   refreshAll();
 
-  // Periodic refresh every 15 seconds
+  // Periodic refresh every 10 seconds
   if(!window._dashInterval){
-    window._dashInterval=setInterval(refreshAll,15000);
+    window._dashInterval=setInterval(refreshAll,10000);
   }
 }
 

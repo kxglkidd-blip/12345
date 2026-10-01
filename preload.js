@@ -7,5 +7,6 @@ contextBridge.exposeInMainWorld('andruxDesktop', {
   minimize: () => ipcRenderer.send('window-minimize'),
   maximize: () => ipcRenderer.send('window-maximize'),
   close: () => ipcRenderer.send('window-close'),
-  openExternal: (url) => ipcRenderer.invoke('open-external', String(url || ''))
+  openExternal: (url) => ipcRenderer.invoke('open-external', String(url || '')),
+  robloxJson: (url, options) => ipcRenderer.invoke('roblox-json', String(url || ''), options || {})
 });

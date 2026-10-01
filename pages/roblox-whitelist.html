@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="referrer" content="strict-origin-when-cross-origin">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob: https:; connect-src https://*.supabase.co https://api.ipify.org https://users.roproxy.com; object-src 'none'; base-uri 'none'; frame-ancestors 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob: https:; connect-src https://*.supabase.co https://api.ipify.org https://users.roblox.com https://thumbnails.roblox.com https://users.roproxy.com https://thumbnails.roproxy.com https://users.ff-roproxy.com https://users.rotunnel.com https://thumbnails.ff-roproxy.com https://thumbnails.rotunnel.com; object-src 'none'; base-uri 'none'; frame-ancestors 'none'">
 <title>Andrux Roblox 白名单</title>
 <link rel="stylesheet" href="../assets/styles.css">
 </head>
@@ -48,7 +48,6 @@
 <div>
 <span class="eyebrow" data-i18n="rbx.eyebrow">Roblox</span>
 <h2 data-i18n="rbx.title">Roblox 白名单</h2>
-<p class="subtext" data-i18n="rbx.desc">绑定你的 Roblox 用户名，获得执行器权限。绑定后加入游戏时自动获得执行器 UI。</p>
 </div>
 <span id="wlBindCount" class="wl-badge">0/5</span>
 </div>
@@ -62,6 +61,8 @@
 .wl-account-item:hover{border-color:var(--accent)}
 .wl-avatar{width:42px;height:42px;border-radius:50%;object-fit:cover;flex-shrink:0;background:var(--rule)}
 .wl-avatar-fallback{width:42px;height:42px;border-radius:50%;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:600;flex-shrink:0}
+.wl-avatar-slot{position:relative;width:42px;height:42px;flex-shrink:0}
+.wl-avatar-slot .wl-avatar,.wl-avatar-slot .wl-avatar-fallback{position:absolute;top:0;left:0;width:42px;height:42px}
 .wl-unbind-btn{padding:6px 14px;font-size:12px;border-radius:10px;background:transparent;border:1px solid var(--bad);color:var(--bad);cursor:pointer;transition:background .2s,color .2s;flex-shrink:0}
 .wl-unbind-btn:hover{background:var(--bad);color:#fff}
 .wl-pending-badge{font-size:11px;color:var(--accent2);background:rgba(32,58,51,0.08);padding:2px 8px;border-radius:8px;margin-left:6px}
@@ -90,8 +91,8 @@
 <script src="../assets/i18n.js?v=16"></script>
 <script src="../assets/polyfill.js?v=13"></script>
 <script src="../assets/game-filter.js?v=4"></script>
-<script src="../assets/page-app.js"></script>
+<script src="../assets/page-app.js?v=21"></script>
 <script src="../assets/game-fix.js?v=12"></script>
-<script src="../assets/roblox-whitelist.js?v=31"></script>
+<script src="../assets/roblox-whitelist.js?v=38"></script>
 </body>
 </html>

@@ -20,6 +20,41 @@ function openExternalSafe(url) {
 
 ipcMain.handle('open-external', (_event, url) => openExternalSafe(url));
 
+/* Roblox's public APIs send no CORS headers, so a fetch() from the renderer (file:// origin)
+   is blocked. Proxy these JSON lookups through the main process, which has no CORS. */
+const ALLOWED_JSON_HOSTS = new Set([
+  'users.roblox.com',
+  'thumbnails.roblox.com',
+  'users.roproxy.com',
+  'thumbnails.roproxy.com',
+  'users.ff-roproxy.com',
+  'thumbnails.ff-roproxy.com',
+  'users.rotunnel.com',
+  'thumbnails.rotunnel.com'
+]);
+
+ipcMain.handle('roblox-json', async (_event, url, options) => {
+  const opts = options || {};
+  const parsed = new URL(String(url || ''));
+  if (parsed.protocol !== 'https:' || !ALLOWED_JSON_HOSTS.has(parsed.hostname)) {
+    throw new Error('blocked host: ' + parsed.hostname);
+  }
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), opts.timeout || 8000);
+  try {
+    const res = await fetch(parsed.toString(), {
+      method: opts.method || 'GET',
+      headers: Object.assign({ 'User-Agent': 'Andrux/1.0' }, opts.headers || {}),
+      body: opts.body,
+      signal: controller.signal
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    return await res.json();
+  } finally {
+    clearTimeout(timer);
+  }
+});
+
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1280,

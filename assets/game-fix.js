@@ -669,7 +669,6 @@ setTimeout(function(){loadTitles(function(){injectMessageTitles();injectProfileT
 /* ===== Game Page Fixes: broken cover images + offline player count zero ===== */
 (function(){
 'use strict';
-var STALE_MS=5*60*1000; /* 5 min */
 
 function fixGameCard(card){
   if(!card||card._gxFixed)return;
