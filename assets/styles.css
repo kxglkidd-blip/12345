@@ -131,16 +131,15 @@ body.reduce-motion .gd-mask,body.reduce-motion .gd-card,body.reduce-motion .gd-c
   .gd-srv-acts{width:100%;justify-content:flex-end;}
 }
 
-/* ===== Luau syntax highlight (executor, visual only) ===== */
-.luau-hl-wrap{position:relative;width:100%;border:1px solid var(--rule);border-radius:16px;background:rgba(23,19,13,0.94);overflow:hidden;min-height:420px;max-height:calc(100vh - 380px);}
+/* ===== Luau syntax highlight + edit animations (executor) ===== */
+.luau-hl-wrap{position:relative;width:100%;border:1px solid var(--rule);border-radius:16px;background:rgba(23,19,13,0.94);overflow:hidden;min-height:420px;max-height:calc(100vh - 380px);transition:border-color .2s,box-shadow .25s;}
 .luau-hl-wrap:focus-within{border-color:var(--accent2);box-shadow:0 0 0 4px rgba(32,58,51,0.13);}
 .luau-hl-pre,.luau-hl-textarea{margin:0;padding:16px 18px;border:none;border-radius:0;width:100%;min-height:420px;max-height:calc(100vh - 380px);box-sizing:border-box;font-family:var(--font-mono),Consolas,monospace;font-size:13px;line-height:1.55;tab-size:2;white-space:pre;word-wrap:normal;overflow:auto;}
 .luau-hl-pre{position:absolute;inset:0;z-index:1;color:#c8c2b8;pointer-events:none;background:transparent;overflow:hidden;}
-.luau-hl-code{display:block;font:inherit;color:inherit;background:transparent;}
+.luau-hl-code{display:block;font:inherit;color:inherit;background:transparent;transition:opacity .12s ease;}
 .luau-hl-textarea{position:relative;z-index:2;background:transparent!important;color:transparent!important;-webkit-text-fill-color:transparent;caret-color:#e8e2d6;resize:vertical;outline:none;box-shadow:none!important;border:none!important;}
 .luau-hl-textarea::placeholder{color:rgba(116,109,97,.55)!important;-webkit-text-fill-color:rgba(116,109,97,.55);}
 .luau-hl-textarea::selection{background:rgba(111,77,45,.45);color:#fffaf1;-webkit-text-fill-color:#fffaf1;}
-/* Studio-like token colors on dark editor */
 .lh-keyword{color:#c586c0;font-weight:600;}
 .lh-builtin{color:#4fc1ff;}
 .lh-func{color:#dcdcaa;}
@@ -148,6 +147,31 @@ body.reduce-motion .gd-mask,body.reduce-motion .gd-card,body.reduce-motion .gd-c
 .lh-number{color:#b5cea8;}
 .lh-comment{color:#6a9955;font-style:italic;}
 .lh-op{color:#d4d4d4;}
+/* insert / delete pulse on editor chrome */
+@keyframes luauInsertPulse{
+  0%{box-shadow:0 0 0 0 rgba(45,111,82,0);border-color:var(--rule);}
+  35%{box-shadow:0 0 0 4px rgba(45,111,82,0.28);border-color:#2d6f52;}
+  100%{box-shadow:0 0 0 0 rgba(45,111,82,0);border-color:var(--rule);}
+}
+@keyframes luauDeletePulse{
+  0%{box-shadow:0 0 0 0 rgba(138,45,45,0);border-color:var(--rule);}
+  35%{box-shadow:0 0 0 4px rgba(138,45,45,0.28);border-color:#8a2d2d;}
+  100%{box-shadow:0 0 0 0 rgba(138,45,45,0);border-color:var(--rule);}
+}
+.luau-hl-wrap.luau-anim-insert{animation:luauInsertPulse .38s ease-out;}
+.luau-hl-wrap.luau-anim-delete{animation:luauDeletePulse .38s ease-out;}
+/* caret-area ripple */
+.luau-ripple{position:absolute;z-index:3;width:10px;height:10px;margin:-5px 0 0 -5px;border-radius:50%;pointer-events:none;opacity:0;}
+.luau-ripple.insert{background:rgba(45,111,82,0.55);animation:luauRippleIn .4s ease-out forwards;}
+.luau-ripple.delete{background:rgba(200,80,80,0.5);animation:luauRippleOut .4s ease-out forwards;}
+@keyframes luauRippleIn{
+  0%{transform:scale(0.4);opacity:.9;}
+  100%{transform:scale(2.4);opacity:0;}
+}
+@keyframes luauRippleOut{
+  0%{transform:scale(1.6);opacity:.85;}
+  100%{transform:scale(0.3);opacity:0;}
+}
 @media(max-width:900px){
   .luau-hl-wrap{min-height:280px;max-height:400px;}
   .luau-hl-pre,.luau-hl-textarea{min-height:280px;max-height:400px;}

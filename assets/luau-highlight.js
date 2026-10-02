@@ -1,4 +1,4 @@
-/* Andrux Luau syntax highlighter — visual only, does not affect execution */
+/* Andrux Luau syntax highlight + insert/delete animations — visual only */
 (function () {
   'use strict';
 
@@ -8,7 +8,6 @@
     repeat:1, return:1, then:1, true:1, type:1, until:1, while:1
   };
 
-  /* Common Roblox / Luau globals (Studio-ish) */
   var BUILTINS = {
     print:1, warn:1, error:1, assert:1, type:1, typeof:1, pairs:1, ipairs:1,
     next:1, select:1, unpack:1, tostring:1, tonumber:1, pcall:1, xpcall:1,
@@ -40,10 +39,8 @@
     while (i < n) {
       var c = src.charAt(i);
 
-      /* long comment --[[ ... ]] */
       if (c === '-' && src.charAt(i + 1) === '-' && src.charAt(i + 2) === '[') {
-        var j = i + 2;
-        var eq = 0;
+        var j = i + 2, eq = 0;
         if (src.charAt(j) === '[') {
           j++;
           while (src.charAt(j) === '=') { eq++; j++; }
@@ -59,7 +56,6 @@
         }
       }
 
-      /* line comment -- */
       if (c === '-' && src.charAt(i + 1) === '-') {
         var endLine = src.indexOf('\n', i);
         if (endLine < 0) endLine = n;
@@ -68,10 +64,8 @@
         continue;
       }
 
-      /* long string [[...]] or [=[...]=] */
       if (c === '[') {
-        var j2 = i + 1;
-        var eq2 = 0;
+        var j2 = i + 1, eq2 = 0;
         while (src.charAt(j2) === '=') { eq2++; j2++; }
         if (src.charAt(j2) === '[') {
           j2++;
@@ -84,10 +78,8 @@
         }
       }
 
-      /* strings "..." or '...' */
       if (c === '"' || c === "'") {
-        var q = c;
-        var k = i + 1;
+        var q = c, k = i + 1;
         while (k < n) {
           var ch = src.charAt(k);
           if (ch === '\\') { k += 2; continue; }
@@ -100,7 +92,6 @@
         continue;
       }
 
-      /* numbers */
       if (/[0-9]/.test(c) || (c === '.' && /[0-9]/.test(src.charAt(i + 1)))) {
         var m = i;
         if (c === '0' && (src.charAt(i + 1) === 'x' || src.charAt(i + 1) === 'X')) {
@@ -126,7 +117,6 @@
         continue;
       }
 
-      /* identifiers / keywords / builtins */
       if (/[A-Za-z_]/.test(c)) {
         var idEnd = i + 1;
         while (/[A-Za-z0-9_]/.test(src.charAt(idEnd))) idEnd++;
@@ -136,7 +126,6 @@
         } else if (BUILTINS[word]) {
           out += '<span class="lh-builtin">' + escapeHtml(word) + '</span>';
         } else {
-          /* function name if followed by ( */
           var peek = idEnd;
           while (src.charAt(peek) === ' ' || src.charAt(peek) === '\t') peek++;
           if (src.charAt(peek) === '(') {
@@ -149,7 +138,6 @@
         continue;
       }
 
-      /* operators */
       if ('+-*/%^#=~<>(){}[],.;:'.indexOf(c) >= 0) {
         var opEnd = i + 1;
         var two = src.slice(i, i + 2);
@@ -166,6 +154,48 @@
       i++;
     }
     return out;
+  }
+
+  function playAnim(wrap, kind) {
+    if (!wrap) return;
+    wrap.classList.remove('luau-anim-insert', 'luau-anim-delete');
+    /* force reflow so animation can re-trigger */
+    void wrap.offsetWidth;
+    wrap.classList.add(kind === 'insert' ? 'luau-anim-insert' : 'luau-anim-delete');
+    var done = function () {
+      wrap.classList.remove('luau-anim-insert', 'luau-anim-delete');
+      wrap.removeEventListener('animationend', done);
+    };
+    wrap.addEventListener('animationend', done);
+  }
+
+  function spawnRipple(wrap, textarea, kind) {
+    try {
+      var style = window.getComputedStyle(textarea);
+      var padL = parseFloat(style.paddingLeft) || 18;
+      var padT = parseFloat(style.paddingTop) || 16;
+      var fontSize = parseFloat(style.fontSize) || 13;
+      var lineHeight = parseFloat(style.lineHeight) || fontSize * 1.55;
+      var val = textarea.value;
+      var pos = textarea.selectionStart || 0;
+      var before = val.slice(0, pos);
+      var lines = before.split('\n');
+      var row = lines.length - 1;
+      var col = lines[lines.length - 1].length;
+      /* approximate char width for monospace */
+      var charW = fontSize * 0.6;
+      var x = padL + col * charW - textarea.scrollLeft;
+      var y = padT + row * lineHeight - textarea.scrollTop + lineHeight * 0.5;
+
+      var ripple = document.createElement('span');
+      ripple.className = 'luau-ripple ' + (kind === 'insert' ? 'insert' : 'delete');
+      ripple.style.left = Math.max(8, Math.min(x, wrap.clientWidth - 8)) + 'px';
+      ripple.style.top = Math.max(8, Math.min(y, wrap.clientHeight - 8)) + 'px';
+      wrap.appendChild(ripple);
+      setTimeout(function () {
+        if (ripple.parentNode) ripple.parentNode.removeChild(ripple);
+      }, 450);
+    } catch (e) {}
   }
 
   function mount(textarea) {
@@ -187,43 +217,60 @@
 
     textarea.classList.add('luau-hl-textarea');
 
-    function sync() {
+    var lastLen = textarea.value.length;
+    var animLock = false;
+
+    function sync(fromUser) {
       var val = textarea.value;
       var html = highlight(val);
-      /* trailing newline needs a space so pre height matches */
       if (val.slice(-1) === '\n') html += ' ';
       code.innerHTML = html || ' ';
       pre.scrollTop = textarea.scrollTop;
       pre.scrollLeft = textarea.scrollLeft;
+
+      if (fromUser) {
+        var len = val.length;
+        if (len > lastLen) {
+          playAnim(wrap, 'insert');
+          spawnRipple(wrap, textarea, 'insert');
+        } else if (len < lastLen) {
+          playAnim(wrap, 'delete');
+          spawnRipple(wrap, textarea, 'delete');
+        }
+        lastLen = len;
+      } else {
+        lastLen = val.length;
+      }
     }
 
-    textarea.addEventListener('input', sync);
+    textarea.addEventListener('input', function () { sync(true); });
     textarea.addEventListener('scroll', function () {
       pre.scrollTop = textarea.scrollTop;
       pre.scrollLeft = textarea.scrollLeft;
     });
-    /* also on paste / programmatic clear */
-    textarea.addEventListener('change', sync);
+    textarea.addEventListener('change', function () { sync(false); });
 
-    var obs = new MutationObserver(function () { sync(); });
-    obs.observe(textarea, { attributes: true, attributeFilter: ['value'] });
-
-    /* intercept value setter when scripts clear the editor */
     try {
       var desc = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value');
       if (desc && desc.set) {
         Object.defineProperty(textarea, 'value', {
           get: function () { return desc.get.call(this); },
           set: function (v) {
+            var prev = desc.get.call(this);
             desc.set.call(this, v);
-            sync();
+            var kind = (v || '').length >= (prev || '').length ? 'insert' : 'delete';
+            if ((v || '') !== (prev || '')) {
+              playAnim(wrap, kind);
+            }
+            lastLen = (v || '').length;
+            sync(false);
           },
           configurable: true
         });
       }
     } catch (e) {}
 
-    sync();
+    sync(false);
   }
 
   function init() {
@@ -239,7 +286,6 @@
   setTimeout(init, 500);
   setTimeout(init, 1500);
 
-  /* exec panel may unlock later */
   var bodyObs = new MutationObserver(function () {
     var ta = document.getElementById('execScriptInput');
     if (ta && ta.dataset.luauHl !== '1') mount(ta);
