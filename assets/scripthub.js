@@ -136,6 +136,51 @@ function deleteCard(card){
   lsSet(a);return Promise.resolve();
 }
 
+/* 只有作者本人（或管理员）可以更改卡片，别人的卡片一律不可改 */
+function canEditCard(c){
+  if(!c)return false;
+  if(String(c.id).indexOf('preset-')===0)return false;
+  if(checkIsAdmin())return true;
+  var me=getCurrentUser();
+  if(!me||me==='Player')return false;
+  return !!c.author&&c.author===me;
+}
+
+/* 更新卡片：数据库卡片走 PATCH，本地卡片写回 localStorage */
+function updateCard(card,data){
+  if(!canEditCard(card)){
+    toast(tt('sh.edit_own_only'));
+    return Promise.reject(new Error('no permission'));
+  }
+  function apply(){
+    card.type=data.type;card.title=data.title;card.desc=data.desc;
+    card.content=data.content;card.bg=data.bg;
+  }
+  var isLocal=String(card.id).indexOf('local-')===0;
+  var isPreset=String(card.id).indexOf('preset-')===0;
+  if(dbReady&&!isLocal&&!isPreset){
+    return fetch(SU+'/rest/v1/'+TABLE+'?id=eq.'+encodeURIComponent(card.id),{
+      method:'PATCH',
+      headers:Object.assign({},HDRS,{'Prefer':'return=minimal'}),
+      body:JSON.stringify({
+        type:data.type,
+        title:data.title,
+        description:data.desc,
+        content:data.content,
+        bg_url:data.bg
+      })
+    }).then(function(r){
+      if(!r.ok)return r.text().then(function(t){throw new Error('HTTP '+r.status+': '+t);});
+      apply();
+    });
+  }
+  apply();
+  var a=lsGet();
+  for(var i=0;i<a.length;i++){if(a[i].id===card.id)a[i]=card;}
+  lsSet(a);
+  return Promise.resolve();
+}
+
 /* ===== 目标服务器（从 ax_gs 读取，与执行器一致，修复“暂无在线服务器”） ===== */
 var currentPlaceId=null;
 function loadServers(){
@@ -321,9 +366,13 @@ function executeCard(c){
 
 /* ===== 卡片详情弹窗 ===== */
 var activeDetailCard=null;
+var editingCard=null;
 function showCardDetail(c,bgStyle){
   activeDetailCard=c;
   var m=$('shDetailModal');if(!m)return;
+  /* 只有自己的卡片才显示「更改脚本」，别人的卡片该按钮隐藏 */
+  var editBtn=$('detailEditBtn');
+  if(editBtn)editBtn.style.display=canEditCard(c)?'':'none';
   var t=$('detailTitle');if(t)t.textContent=c.title||tt('sh.detail_title');
   var cover=$('detailCover');
   if(cover){
@@ -441,14 +490,32 @@ function updateContentFieldByType(){
   if(lbl){lbl.textContent=isReq?tt('sh.content_label_require'):tt('sh.content_label_script');lbl.setAttribute('data-i18n',isReq?'sh.content_label_require':'sh.content_label_script');}
   if(ta){ta.placeholder=isReq?tt('sh.content_ph_require'):tt('sh.content_ph_script');ta.setAttribute('data-i18n-ph',isReq?'sh.content_ph_require':'sh.content_ph_script');}
 }
-function openModal(){
-  var m=$('shModal');if(m)m.classList.add('open');
+function openModal(card){
+  editingCard=card||null;
+  var m=$('shModal');if(!m)return;
+  var title=$('modalTitle');
+  var saveBtn=m.querySelector('.sh-modal-btn-save');
+  if(editingCard){
+    /* 编辑模式：标题/按钮切换为「更改」，并把原卡片内容填回表单 */
+    if(title){title.textContent=tt('sh.modal_edit_title');title.setAttribute('data-i18n','sh.modal_edit_title');}
+    if(saveBtn){saveBtn.textContent=tt('sh.save_changes');saveBtn.setAttribute('data-i18n','sh.save_changes');}
+    if($('cardType'))$('cardType').value=editingCard.type==='require'?'require':'script';
+    if($('cardTitle'))$('cardTitle').value=editingCard.title||'';
+    if($('cardDesc'))$('cardDesc').value=editingCard.desc||'';
+    if($('cardContent'))$('cardContent').value=editingCard.content||'';
+    if($('cardBg'))$('cardBg').value=editingCard.bg||'';
+  }else{
+    if($('shAddForm'))$('shAddForm').reset();
+    if(title){title.textContent=tt('sh.modal_add_title');title.setAttribute('data-i18n','sh.modal_add_title');}
+    if(saveBtn){saveBtn.textContent=tt('sh.save_card');saveBtn.setAttribute('data-i18n','sh.save_card');}
+  }
+  m.classList.add('open');
   updateContentFieldByType();
 }
-function closeModal(){var m=$('shModal');if(m)m.classList.remove('open');}
+function closeModal(){var m=$('shModal');if(m)m.classList.remove('open');editingCard=null;}
 
 function initUI(){
-  var btn=$('shOpenAddModal');if(btn)btn.onclick=openModal;
+  var btn=$('shOpenAddModal');if(btn)btn.onclick=function(){openModal();};
   var close=$('shCloseModal');if(close)close.onclick=closeModal;
   var cancel=$('shCancelBtn');if(cancel)cancel.onclick=closeModal;
   var mask=$('shModal');
@@ -473,6 +540,16 @@ function initUI(){
     if(activeDetailCard){executeCard(activeDetailCard);closeDetailModal();}
   };
 
+  /* 详情里点「更改脚本」→ 打开编辑表单（仅自己的卡片可见） */
+  var dEditBtn=$('detailEditBtn');
+  if(dEditBtn)dEditBtn.onclick=function(){
+    if(!activeDetailCard)return;
+    if(!canEditCard(activeDetailCard)){toast(tt('sh.edit_own_only'));return;}
+    var c=activeDetailCard;
+    closeDetailModal();
+    openModal(c);
+  };
+
   var typeSel=$('cardType');
   if(typeSel){
     typeSel.onchange=updateContentFieldByType;
@@ -488,7 +565,25 @@ function initUI(){
     var desc=$('cardDesc').value.trim();
     var bg=$('cardBg').value.trim();
     if(!title||!content){toast(tt('sh.need_title_content'));return;}
-    saveCard({type:type,title:title,desc:desc,content:content,bg:bg})
+    var data={type:type,title:title,desc:desc,content:content,bg:bg};
+
+    /* 编辑模式：更新已有卡片；新增模式：发布新卡片 */
+    var editing=editingCard;
+    if(editing){
+      updateCard(editing,data)
+        .then(function(){
+          editingCard=null;
+          closeModal();
+          $('shAddForm').reset();
+          updateContentFieldByType();
+          toast(tt('sh.card_updated'));
+          loadCards();
+        })
+        .catch(function(err){if(!err||err.message!=='no permission')toast(tt('sh.update_fail')+((err&&err.message)||''));});
+      return;
+    }
+
+    saveCard(data)
       .then(function(){
         closeModal();
         $('shAddForm').reset();

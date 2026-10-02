@@ -245,6 +245,12 @@
   transition:all .2s;
 }
 .sh-detail-foot .sh-detail-close:hover{color:var(--ink);background:#fff;}
+.sh-detail-foot .sh-detail-edit{
+  border:1px solid var(--accent2);border-radius:14px;padding:11px 18px;
+  background:rgba(255,255,255,.85);color:var(--accent2);font-weight:700;font-size:13px;cursor:pointer;
+  transition:all .2s;
+}
+.sh-detail-foot .sh-detail-edit:hover{background:var(--accent2);color:#fffaf1;transform:translateY(-1px);}
 
 @keyframes axCardIn{from{opacity:0;transform:translateY(18px) scale(.97);}to{opacity:1;transform:translateY(0) scale(1);}}
 @keyframes axScaleIn{from{opacity:0;transform:scale(.94) translateY(10px);}to{opacity:1;transform:scale(1) translateY(0);}}
@@ -392,18 +398,19 @@
 </div>
 <div class="sh-modal-foot sh-detail-foot">
   <button type="button" id="detailCloseBtn" class="sh-detail-close" data-i18n="sh.close">关闭</button>
+  <button type="button" id="detailEditBtn" class="sh-detail-edit" style="display:none" data-i18n="sh.edit_card">✏️ 更改脚本</button>
   <button type="button" id="detailExecBtn" class="sh-detail-exec" data-i18n="sh.exec_now">▶ 立即执行</button>
 </div>
 </div>
 </div>
 
 <div id="toast" class="toast" data-i18n="misc.notice">提示</div>
-<script src="../assets/i18n.js?v=26"></script>
+<script src="../assets/i18n.js?v=29"></script>
 <script src="../assets/polyfill.js?v=13"></script>
 <script src="../assets/ui-motion.js?v=1"></script>
 <script src="../assets/game-filter.js?v=5"></script>
 <script src="../assets/page-app.js?v=36"></script>
 <script src="../assets/game-fix.js?v=19"></script>
-<script src="../assets/scripthub.js?v=27"></script>
+<script src="../assets/scripthub.js?v=30"></script>
 </body>
 </html>
