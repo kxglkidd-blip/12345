@@ -1,342 +1,498 @@
-/* Andrux Script Hub — messages + player actions */
+/* Andrux Script Hub — Require / Script 卡片库（支持详情查看与权限删除） */
 (function(){
 'use strict';
 
 var SU='https://nyourvnfzhxbofwmavgq.supabase.co';
 var SK='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im55b3Vydm5memh4Ym9md21hdmdxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUwOTYwMTIsImV4cCI6MjEwMDY3MjAxMn0.YqztdjSz8kDAf9sHpqVeiMLjfwSbl4kvc8O5sGyJkvg';
-var TABLE='ax_gs';
 var HDRS={apikey:SK,Authorization:'Bearer '+SK,'Content-Type':'application/json'};
+var TABLE='ax_hub_scripts';
+var LS_KEY='andrux_hub_cards';
 
 function $(id){return document.getElementById(id);}
 function tt(k){if(window.I18N&&typeof window.I18N.t==='function'){var v=window.I18N.t(k);if(v&&v!==k)return v;}return k;}
 
-/* ===== Self-contained i18n application (fixes Cloudflare issue) ===== */
-function applyI18n(){
-  var els=document.querySelectorAll('[data-i18n]');
-  for(var i=0;i<els.length;i++){
-    var key=els[i].getAttribute('data-i18n');
-    var val=tt(key);
-    if(val&&val!==key){els[i].textContent=val;}
-  }
-  var phEls=document.querySelectorAll('[data-i18n-ph]');
-  for(var j=0;j<phEls.length;j++){
-    var pkey=phEls[j].getAttribute('data-i18n-ph');
-    var pval=tt(pkey);
-    if(pval&&pval!==pkey){phEls[j].setAttribute('placeholder',pval);}
-  }
-}
-
 function toast(msg){
-var el=$('toast');if(!el)return;
-el.textContent=msg;el.classList.add('show');
-clearTimeout(toast._t);
-toast._t=setTimeout(function(){el.classList.remove('show');},2500);
+  var el=$('toast');if(!el)return;
+  el.textContent=msg;el.classList.add('show');
+  clearTimeout(toast._t);
+  toast._t=setTimeout(function(){el.classList.remove('show');},2500);
 }
 
-function apiGet(path){
-return fetch(SU+'/rest/v1/'+path,{headers:HDRS}).then(function(r){return r.json();});
-}
-function apiPatch(path,body){
-return fetch(SU+'/rest/v1/'+path,{
-method:'PATCH',
-headers:Object.assign({},HDRS,{Prefer:'return=minimal'}),
-body:JSON.stringify(body)
-}).then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r;});
-}
-
-/* ===== Server select ===== */
-/* ===== Execution log: insert into ax_exec_log + bump local counter ===== */
-function logExec(placeId,robloxName,source){
-try{
-var n=(parseInt(localStorage.getItem('andrux_total_execs')||'0',10)||0)+1;
-localStorage.setItem('andrux_total_execs',String(n));
-window.dispatchEvent(new CustomEvent('andrux_exec_logged',{detail:{total:n}}));
-}catch(e){}
-return fetch(SU+'/rest/v1/ax_exec_log',{
-method:'POST',
-headers:Object.assign({},HDRS,{Prefer:'return=minimal'}),
-body:JSON.stringify({place_id:String(placeId),roblox_name:robloxName||null,source:source})
-}).catch(function(){});
+/* 获取当前登录用户名与管理员权限 */
+function getCurrentUser(){
+  try{
+    var su=$('sideUsername');
+    if(su&&su.textContent&&su.textContent!=='Player'&&su.textContent!=='加载中...')return su.textContent.trim();
+    var s=localStorage.getItem('andrux_session')||localStorage.getItem('andrux_user');
+    if(s){
+      try{var obj=JSON.parse(s);if(obj&&obj.username)return obj.username;}catch(e){}
+    }
+  }catch(e){}
+  return localStorage.getItem('andrux_username')||'Player';
 }
 
-function hideOffline(){
-  try{return localStorage.getItem('andrux_hide_offline')==='1';}catch(e){return false;}
+function checkIsAdmin(){
+  var user=getCurrentUser().toLowerCase();
+  if(user==='admin'||user==='kxglkidd'||user==='owner'||user==='root')return true;
+  try{
+    if(localStorage.getItem('andrux_is_admin')==='true')return true;
+    if(localStorage.getItem('andrux_role')==='admin')return true;
+    var s=localStorage.getItem('andrux_session');
+    if(s){
+      var obj=JSON.parse(s);
+      if(obj&&(obj.is_admin||obj.role==='admin'))return true;
+    }
+  }catch(e){}
+  return false;
 }
 
-var SERVER_STALE_MS=40000; /* server heartbeats ~every 30s; no beat within 40s = offline */
-function serverAlive(r){
-if(!r||r.status!=='online')return false;
-if(!r.last_heartbeat)return false;
-var hb=new Date(r.last_heartbeat).getTime();
-if(isNaN(hb))return false;
-return (Date.now()-hb)<=SERVER_STALE_MS;
+/* 预置卡片 */
+var DEFAULT_CARDS=[
+  {id:'preset-1',type:'require',title:'Infinite Yield 命令模块',desc:'经典管理命令面板，全服广播执行。',content:'require(0vXAJuY5ZLTAZigO1rIm)',bg:'',author:'Official'},
+  {id:'preset-2',type:'script',title:'天空传送脚本',desc:'将你传送到地图上空 100 格处悬浮。',content:'local c=game.Players.LocalPlayer.Character\nif c and c:FindFirstChild("HumanoidRootPart") then\nc.HumanoidRootPart.CFrame=c.HumanoidRootPart.CFrame+Vector3.new(0,100,0)\nend',bg:'',author:'Official'},
+  {id:'preset-3',type:'script',title:'彩虹加速脚本',desc:'角色移动速度加倍，安全提速。',content:'local c=game.Players.LocalPlayer.Character\nlocal h=c and c:FindFirstChildOfClass("Humanoid")\nif h then h.WalkSpeed=32 end',bg:'',author:'Official'}
+];
+
+function lsGet(){try{return JSON.parse(localStorage.getItem(LS_KEY)||'[]');}catch(e){return [];}}
+function lsSet(a){try{localStorage.setItem(LS_KEY,JSON.stringify(a));}catch(e){}}
+
+var cards=[];
+var dbReady=false;
+
+function loadCards(){
+  return fetch(SU+'/rest/v1/'+TABLE+'?select=*&order=created_at.desc',{headers:HDRS})
+    .then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.json();})
+    .then(function(rows){
+      dbReady=true;
+      cards=(rows||[]).map(function(r){
+        return{id:r.id,type:r.type,title:r.title,desc:r.description||'',content:r.content,bg:r.bg_url||'',author:r.author||'Community',created_at:r.created_at};
+      });
+      if(!cards.length){cards=DEFAULT_CARDS.slice();}
+      render();
+    })
+    .catch(function(){
+      dbReady=false;
+      cards=lsGet();
+      if(!cards.length){cards=DEFAULT_CARDS.slice();lsSet(cards);}
+      render();
+    });
 }
 
+function saveCard(card){
+  card.author = getCurrentUser();
+  if(dbReady){
+    var postHeaders = Object.assign({}, HDRS, {
+      'Prefer': 'return=representation'
+    });
+    return fetch(SU + '/rest/v1/' + TABLE, {
+      method: 'POST',
+      headers: postHeaders,
+      body: JSON.stringify({
+        type: card.type,
+        title: card.title,
+        description: card.desc,
+        content: card.content,
+        bg_url: card.bg,
+        author: card.author
+      })
+    }).then(function(r){
+      if(!r.ok){
+        return r.text().then(function(t){
+          throw new Error('HTTP ' + r.status + ': ' + t);
+        });
+      }
+      return r.text().then(function(text){
+        if (!text || !text.trim()) return [];
+        try { return JSON.parse(text); } catch(e) { return []; }
+      });
+    }).then(function(rows){
+      var newId = (rows && rows[0] && rows[0].id) ? rows[0].id : ('db-' + Date.now());
+      card.id = newId;
+      cards.unshift(card);
+      render();
+      return newId;
+    });
+  }
+  var a = lsGet();
+  card.id = 'local-' + Date.now();
+  a.unshift(card);
+  lsSet(a);
+  cards.unshift(card);
+  render();
+  return Promise.resolve(card.id);
+}
+
+function deleteCard(card){
+  var me=getCurrentUser();
+  var isAdmin=checkIsAdmin();
+  if(!isAdmin&&card.author&&card.author!==me&&card.author!=='Player'&&String(card.id).indexOf('local-')!==0){
+    toast(tt('sh.delete_own_only'));
+    return Promise.reject(new Error('no permission'));
+  }
+  if(dbReady&&String(card.id).indexOf('preset-')!==0&&String(card.id).indexOf('local-')!==0){
+    return fetch(SU+'/rest/v1/'+TABLE+'?id=eq.'+card.id,{method:'DELETE',headers:HDRS});
+  }
+  var a=lsGet().filter(function(c){return c.id!==card.id;});
+  lsSet(a);return Promise.resolve();
+}
+
+/* ===== 目标服务器（从 ax_gs 读取，与执行器一致，修复“暂无在线服务器”） ===== */
+var currentPlaceId=null;
 function loadServers(){
-var sel=$('shServerSelect');
-if(!sel)return;
-apiGet(TABLE+'?select=place_id,game_name,player_count,status,last_heartbeat&hidden=eq.false&order=game_name.asc')
-.then(function(rows){
-if(!rows||!rows.length){
-sel.innerHTML='<option value="">'+tt('sh.no_servers')+'</option>';
-return;
-}
-var hideOff=hideOffline();
-var filtered=rows.filter(function(r){
-  if(hideOff&&!serverAlive(r))return false;
-  return true;
-});
-if(!filtered.length){
-sel.innerHTML='<option value="">'+(hideOff?tt('sh.no_online'):tt('sh.no_servers'))+'</option>';
-return;
-}
-sel.innerHTML=filtered.map(function(r){
-var alive=serverAlive(r);
-var name=r.game_name||r.place_id;
-var pc=alive?(r.player_count||0):0;
-var statusTag=alive?'':' ['+(tt('sh.offline')||'离线')+']';
-return'<option value="'+r.place_id+'"'+(alive?'':' data-offline="1"')+'>'+name+statusTag+' ('+pc+')</option>';
-}).join('');
-})
-.catch(function(){sel.innerHTML='<option value="">'+tt('sh.load_fail')+'</option>';});
-}
-
-function getSelectedServer(){
-var sel=$('shServerSelect');
-if(!sel)return null;
-var v=sel.value;
-return v||null;
-}
-
-/* ===== Push script to queue ===== */
-function pushScript(script,label,side){
-side=side||'client';
-var placeId=getSelectedServer();
-if(!placeId){toast(tt('sh.select_server'));return;}
-
-var entry;
-if(side==='client'){
-var targetUser=($('shTargetPlayer')?$('shTargetPlayer').value:'').trim();
-if(!targetUser){toast(tt('sh.enter_player'));return;}
-entry={type:'client_script',target:targetUser,script:script};
-}else{
-entry=script;
+  var sel=$('shServerSelect');if(!sel)return;
+  fetch(SU+'/rest/v1/ax_gs?select=place_id,game_name,player_count,status,last_heartbeat&hidden=eq.false&order=game_name.asc',{headers:HDRS})
+    .then(function(r){return r.ok?r.json():[];})
+    .then(function(rows){
+      sel.innerHTML='';
+      if(!rows||!rows.length){
+        sel.innerHTML='<option value="">'+tt('sh.no_games')+'</option>';
+        return;
+      }
+      var now=Date.now();
+      var online=[];
+      var offline=[];
+      rows.forEach(function(row){
+        var pid=String(row.place_id||'');
+        if(!pid)return;
+        var isOnline=row.status==='online';
+        if(row.last_heartbeat){
+          try{
+            var hb=new Date(row.last_heartbeat).getTime();
+            if(isFinite(hb)&&(now-hb)>120000) isOnline=false;
+          }catch(e){}
+        }
+        var item={pid:pid,name:row.game_name||(tt('sh.game_prefix')+pid),pc:row.player_count||0,online:isOnline};
+        if(isOnline) online.push(item); else offline.push(item);
+      });
+      var list=online.concat(offline);
+      if(!list.length){
+        sel.innerHTML='<option value="">'+tt('sh.no_online')+'</option>';
+        return;
+      }
+      list.forEach(function(item){
+        var opt=document.createElement('option');
+        opt.value=item.pid;
+        opt.textContent=item.name+' — '+(item.online?(item.pc+tt('sh.players_unit')):tt('sh.offline'));
+        if(!item.online) opt.disabled=true;
+        sel.appendChild(opt);
+      });
+      if(online.length){
+        sel.value=online[0].pid;
+        currentPlaceId=online[0].pid;
+      }else{
+        currentPlaceId=sel.value||null;
+      }
+      sel.onchange=function(){currentPlaceId=sel.value;};
+    })
+    .catch(function(){sel.innerHTML='<option value="">'+tt('sh.load_fail')+'</option>';});
 }
 
-apiGet(TABLE+'?select=exec_queue&place_id=eq.'+placeId)
-.then(function(rows){
-var queue=[];
-if(rows&&rows[0]&&Array.isArray(rows[0].exec_queue)){
-queue=rows[0].exec_queue;
-}
-queue.push(entry);
-return apiPatch(TABLE+'?place_id=eq.'+placeId,{exec_queue:queue});
-})
-.then(function(){
-logExec(placeId,(entry&&entry.target)||(($('shTargetPlayer')||{}).value||'').trim()||null,'scripthub');
-toast(tt('sh.pushed')+': '+(label||'Script')+' ('+(side==='client'?'客户端':'服务端')+')');
-})
-.catch(function(err){
-toast(tt('sh.push_fail')+': '+(err.message||err));
-});
+/* ===== 白名单：Require 只对白名单 Roblox 玩家执行 ===== */
+function fetchWhitelistNames(){
+  var user=getCurrentUser();
+  if(!user||user==='Player') return Promise.resolve([]);
+  return fetch(SU+'/rest/v1/rpc/ax_list_roblox',{
+    method:'POST',
+    headers:HDRS,
+    body:JSON.stringify({p_username:user})
+  })
+  .then(function(r){return r.ok?r.json():null;})
+  .then(function(res){
+    if(res&&res.ok&&Array.isArray(res.bindings)){
+      return res.bindings.map(function(b){return b.roblox_name;}).filter(Boolean);
+    }
+    try{
+      var local=JSON.parse(localStorage.getItem('andrux_rbx_whitelist')||'[]');
+      if(Array.isArray(local)&&local.length){
+        return local.map(function(b){return b.username||b.name||b.roblox_name;}).filter(Boolean);
+      }
+    }catch(e){}
+    return [];
+  })
+  .catch(function(){
+    try{
+      var local=JSON.parse(localStorage.getItem('andrux_rbx_whitelist')||'[]');
+      if(Array.isArray(local)&&local.length){
+        return local.map(function(b){return b.username||b.name||b.roblox_name;}).filter(Boolean);
+      }
+    }catch(e){}
+    return [];
+  });
 }
 
-/* ===== Message / Hint sending ===== */
-function getTargetPlayer(){
-  var input=$('shTargetPlayer');
-  if(!input)input=$('paTargetUser');
-  return input?(input.value||'').trim():'';
+/* ===== 执行 ===== */
+function logExec(placeId,source){
+  try{
+    var n=(parseInt(localStorage.getItem('andrux_total_execs')||'0',10)||0)+1;
+    localStorage.setItem('andrux_total_execs',String(n));
+    window.dispatchEvent(new CustomEvent('andrux_exec_logged',{detail:{total:n}}));
+  }catch(e){}
+  fetch(SU+'/rest/v1/ax_exec_log',{
+    method:'POST',
+    headers:Object.assign({},HDRS,{Prefer:'return=minimal'}),
+    body:JSON.stringify({place_id:String(placeId),source:source})
+  }).catch(function(){});
 }
 
-function escapeLua(str){
-  return str.replace(/\\/g,'\\\\').replace(/"/g,'\\"').replace(/\n/g,'\\n').replace(/\r/g,'\\r').replace(/\t/g,'\\t');
-}
-
-function getMsgMode(type){
-  var radios=document.querySelectorAll('input[name="'+type+'Mode"]');
-  for(var i=0;i<radios.length;i++){
-    if(radios[i].checked)return radios[i].value;
+function pushToQueue(payloads){
+  if(!currentPlaceId){
+    toast(tt('sh.need_server'));return Promise.reject();
   }
-  return 'world';
+  if(!Array.isArray(payloads)) payloads=[payloads];
+  if(!payloads.length) return Promise.reject(new Error('empty'));
+  var placeUrl=SU+'/rest/v1/ax_gs?place_id=eq.'+currentPlaceId;
+  return fetch(placeUrl+'?select=exec_queue',{headers:HDRS})
+    .then(function(r){return r.json();})
+    .then(function(rows){
+      var q=(rows&&rows[0]&&rows[0].exec_queue)||[];
+      if(!Array.isArray(q))q=[];
+      payloads.forEach(function(p){q.push(p);});
+      return fetch(placeUrl,{
+        method:'PATCH',
+        headers:Object.assign({},HDRS,{Prefer:'return=minimal'}),
+        body:JSON.stringify({exec_queue:q})
+      });
+    })
+    .then(function(r){
+      if(!r.ok)return r.text().then(function(t){throw new Error('HTTP '+r.status+': '+t);});
+      logExec(currentPlaceId,'scripthub');
+      toast(tt('sh.exec_ok'));
+    });
 }
 
-window.toggleMsgTarget=function(type){
-  var mode=getMsgMode(type);
-  var row=$(type+'TargetRow');
-  if(row){
-    row.style.display=(mode==='player')?'':'none';
+function executeCard(c){
+  var content=(c.content||'').trim();
+  if(!content){toast(tt('sh.empty_content'));return;}
+
+  if(c.type==='require'){
+    // Require 只对白名单玩家执行，无需在脚本中心填写用户名
+    var m=content.match(/(\d{4,})/);
+    var assetId=m?m[1]:null;
+    var suffix='';
+    var sm=content.match(/\)\s*([.:])\s*([A-Za-z_][\w]*)/);
+    if(sm) suffix=sm[1]+sm[2];
+
+    if(!assetId){
+      pushToQueue(content).catch(function(){toast(tt('sh.push_fail_conn'));});
+      return;
+    }
+
+    // 推送单条 for_whitelist 指令，由 Roblox 服务端只对「在线且在白名单」的玩家执行
+    // 同时仍校验本地白名单，避免未绑定用户误触
+    fetchWhitelistNames().then(function(names){
+      if(!names||!names.length){
+        toast(tt('sh.need_whitelist'));
+        return;
+      }
+      var payload={
+        type:'asset',
+        asset_id:String(assetId),
+        suffix:suffix,
+        username:'',
+        for_whitelist:true,
+        whitelist_only:true
+      };
+      return pushToQueue(payload).then(function(){
+        toast(tt('sh.require_pushed'));
+      });
+    }).catch(function(){toast(tt('sh.push_fail_conn'));});
+    return;
   }
-};
 
-window.sendMessage=function(){
-  var placeId=getSelectedServer();
-  if(!placeId){toast(tt('sh.select_server'));return;}
-  var mode=getMsgMode('msg');
-  var targetUser='';
-  if(mode==='player'){
-    targetUser=($('msgTargetUser')?$('msgTargetUser').value:'').trim();
-    if(!targetUser){toast(tt('sh.enter_player'));return;}
+  // 普通 Lua 脚本
+  pushToQueue(content).catch(function(){toast(tt('sh.push_fail_conn'));});
+}
+
+/* ===== 卡片详情弹窗 ===== */
+var activeDetailCard=null;
+function showCardDetail(c,bgStyle){
+  activeDetailCard=c;
+  var m=$('shDetailModal');if(!m)return;
+  var t=$('detailTitle');if(t)t.textContent=c.title||tt('sh.detail_title');
+  var cover=$('detailCover');
+  if(cover){
+    if(c.bg)cover.style.backgroundImage="url('"+c.bg+"')";
+    else cover.style.background=bgStyle||'linear-gradient(135deg,#1f2430 0%,#11141c 100%)';
   }
-  var content=($('msgContent')?$('msgContent').value:'').trim();
-  if(!content){toast('请输入消息内容');return;}
-  var duration=parseFloat($('msgDuration')?$('msgDuration').value:'5')||0;
-  var script;
-  var label;
-  if(mode==='world'){
-    script='local m=Instance.new("Message")\n'
-      +'m.Text="'+escapeLua(content)+'"\n'
-      +'m.Parent=workspace\n'
-      +(duration>0?'game:GetService("Debris"):AddItem(m,'+duration+')\n':'');
-    label='Message (World)';
-  }else{
-    script='local target=game:GetService("Players"):FindFirstChild("'+escapeLua(targetUser)+'")\n'
-      +'if not target then return end\n'
-      +'local sg=target:FindFirstChild("PlayerGui") or target:WaitForChild("PlayerGui",5)\n'
-      +'if not sg then return end\n'
-      +'local m=Instance.new("Message")\n'
-      +'m.Text="'+escapeLua(content)+'"\n'
-      +'m.Parent=sg\n'
-      +(duration>0?'game:GetService("Debris"):AddItem(m,'+duration+')\n':'');
-    label='Message -> '+targetUser;
+  var badge=$('detailBadge');
+  if(badge){
+    badge.className='sh-card-badge '+(c.type==='require'?'sh-badge-require':'sh-badge-script');
+    badge.textContent=c.type==='require'?tt('sh.badge_require'):tt('sh.badge_script');
   }
-  pushScript(script,label,'server');
-  if($('msgContent'))$('msgContent').value='';
-};
+  var author=$('detailAuthor');
+  if(author)author.textContent=tt('sh.author')+(c.author||tt('sh.community_player'));
+  var desc=$('detailDesc');
+  if(desc)desc.textContent=c.desc||tt('sh.no_desc');
+  var code=$('detailContent');
+  if(code)code.textContent=c.content||'';
+  m.classList.add('open');
+}
 
-window.sendHint=function(){
-  var placeId=getSelectedServer();
-  if(!placeId){toast(tt('sh.select_server'));return;}
-  var mode=getMsgMode('hint');
-  var targetUser='';
-  if(mode==='player'){
-    targetUser=($('hintTargetUser')?$('hintTargetUser').value:'').trim();
-    if(!targetUser){toast(tt('sh.enter_player'));return;}
+function closeDetailModal(){
+  var m=$('shDetailModal');if(m)m.classList.remove('open');
+}
+
+/* ===== 渲染 ===== */
+function escapeHtml(s){return String(s||'').replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+
+var BG_GRADIENTS=[
+  'linear-gradient(135deg,#667eea 0%,#764ba2 100%)',
+  'linear-gradient(135deg,#f093fb 0%,#f5576c 100%)',
+  'linear-gradient(135deg,#4facfe 0%,#00f2fe 100%)',
+  'linear-gradient(135deg,#43e97b 0%,#38f9d7 100%)',
+  'linear-gradient(135deg,#fa709a 0%,#fee140 100%)',
+  'linear-gradient(135deg,#30cfd0 0%,#330867 100%)'
+];
+
+function render(){
+  var grid=$('shGrid');if(!grid)return;
+  var kw=($('shSearchInput')&&$('shSearchInput').value||'').toLowerCase();
+  grid.innerHTML='';
+  var me=getCurrentUser();
+  var isAdmin=checkIsAdmin();
+
+  var list=cards.filter(function(c){return !kw||(c.title||'').toLowerCase().indexOf(kw)>-1||(c.desc||'').toLowerCase().indexOf(kw)>-1;});
+  if(!list.length){
+    grid.innerHTML='<div style="grid-column:1/-1;text-align:center;color:var(--muted);padding:40px 0">'+tt('sh.no_match')+'</div>';
+    return;
   }
-  var content=($('hintContent')?$('hintContent').value:'').trim();
-  if(!content){toast('请输入提示内容');return;}
-  var duration=parseFloat($('hintDuration')?$('hintDuration').value:'3')||0;
-  var script;
-  var label;
-  if(mode==='world'){
-    script='local h=Instance.new("Hint")\n'
-      +'h.Text="'+escapeLua(content)+'"\n'
-      +'h.Parent=workspace\n'
-      +(duration>0?'game:GetService("Debris"):AddItem(h,'+duration+')\n':'');
-    label='Hint (World)';
-  }else{
-    script='local target=game:GetService("Players"):FindFirstChild("'+escapeLua(targetUser)+'")\n'
-      +'if not target then return end\n'
-      +'local sg=target:FindFirstChild("PlayerGui") or target:WaitForChild("PlayerGui",5)\n'
-      +'if not sg then return end\n'
-      +'local h=Instance.new("Hint")\n'
-      +'h.Text="'+escapeLua(content)+'"\n'
-      +'h.Parent=sg\n'
-      +(duration>0?'game:GetService("Debris"):AddItem(h,'+duration+')\n':'');
-    label='Hint -> '+targetUser;
+  list.forEach(function(c,idx){
+    var el=document.createElement('div');
+    el.className='sh-card';
+    var badge=c.type==='require'?'<span class="sh-card-badge sh-badge-require">Require</span>':'<span class="sh-card-badge sh-badge-script">Script</span>';
+    var bgStyle=c.bg?"background-image:url('"+escapeHtml(c.bg)+"')":'background:'+BG_GRADIENTS[idx%BG_GRADIENTS.length];
+    
+    // 删除权限：仅作者或管理员可删除
+    var canDelete=isAdmin||(c.author&&c.author===me)||(String(c.id).indexOf('local-')===0);
+    var delBtnHtml=canDelete?'<button class="sh-del-btn" title="'+tt('sh.delete_card')+'">🗑</button>':'';
+
+    el.innerHTML=
+      '<div class="sh-card-cover" style="'+bgStyle+'">'+badge+'</div>'+
+      '<div class="sh-card-body">'+
+        '<div class="sh-card-info">'+
+          '<h4>'+escapeHtml(c.title)+'</h4>'+
+          '<p>'+escapeHtml(c.desc||tt('sh.no_intro'))+'</p>'+
+          '<div style="font-size:11px;color:var(--muted);margin-bottom:8px">'+tt('sh.author_prefix')+escapeHtml(c.author||tt('sh.community'))+'</div>'+
+        '</div>'+
+        '<div class="sh-card-actions">'+
+          '<button class="sh-exec-btn">'+tt('sh.exec')+'</button>'+
+          delBtnHtml+
+        '</div>'+
+      '</div>';
+
+    // 点击卡片本体打开详细内容
+    el.onclick=function(e){
+      if(e.target.closest('.sh-exec-btn')||e.target.closest('.sh-del-btn'))return;
+      showCardDetail(c,bgStyle);
+    };
+
+    el.querySelector('.sh-exec-btn').onclick=function(e){
+      e.stopPropagation();
+      executeCard(c);
+    };
+
+    var delBtn=el.querySelector('.sh-del-btn');
+    if(delBtn){
+      delBtn.onclick=function(e){
+        e.stopPropagation();
+        if(!confirm(tt('sh.confirm_delete')+c.title+tt('sh.confirm_delete_end')))return;
+        deleteCard(c).then(loadCards).catch(function(){});
+      };
+    }
+
+    grid.appendChild(el);
+  });
+}
+
+/* ===== 初始化交互 ===== */
+function updateContentFieldByType(){
+  var typeSel=$('cardType');
+  var lbl=$('cardContentLabel');
+  var ta=$('cardContent');
+  if(!typeSel)return;
+  var isReq=typeSel.value==='require';
+  if(lbl){lbl.textContent=isReq?tt('sh.content_label_require'):tt('sh.content_label_script');lbl.setAttribute('data-i18n',isReq?'sh.content_label_require':'sh.content_label_script');}
+  if(ta){ta.placeholder=isReq?tt('sh.content_ph_require'):tt('sh.content_ph_script');ta.setAttribute('data-i18n-ph',isReq?'sh.content_ph_require':'sh.content_ph_script');}
+}
+function openModal(){
+  var m=$('shModal');if(m)m.classList.add('open');
+  updateContentFieldByType();
+}
+function closeModal(){var m=$('shModal');if(m)m.classList.remove('open');}
+
+function initUI(){
+  var btn=$('shOpenAddModal');if(btn)btn.onclick=openModal;
+  var close=$('shCloseModal');if(close)close.onclick=closeModal;
+  var cancel=$('shCancelBtn');if(cancel)cancel.onclick=closeModal;
+  var mask=$('shModal');
+  if(mask)mask.addEventListener('click',function(e){if(e.target===mask)closeModal();});
+
+  // 详情弹窗
+  var closeD=$('shCloseDetailModal');if(closeD)closeD.onclick=closeDetailModal;
+  var closeD2=$('detailCloseBtn');if(closeD2)closeD2.onclick=closeDetailModal;
+  var dMask=$('shDetailModal');
+  if(dMask)dMask.addEventListener('click',function(e){if(e.target===dMask)closeDetailModal();});
+
+  var copyBtn=$('detailCopyBtn');
+  if(copyBtn)copyBtn.onclick=function(){
+    var code=$('detailContent');
+    if(code&&navigator.clipboard){
+      navigator.clipboard.writeText(code.textContent||'').then(function(){toast(tt('sh.copied'));});
+    }
+  };
+
+  var dExecBtn=$('detailExecBtn');
+  if(dExecBtn)dExecBtn.onclick=function(){
+    if(activeDetailCard){executeCard(activeDetailCard);closeDetailModal();}
+  };
+
+  var typeSel=$('cardType');
+  if(typeSel){
+    typeSel.onchange=updateContentFieldByType;
+    updateContentFieldByType();
   }
-  pushScript(script,label,'server');
-  if($('hintContent'))$('hintContent').value='';
-};
 
-/* ===== Player Actions ===== */
-function paBuildScript(action,targetUser){
-var target='game:GetService("Players"):FindFirstChild("'+targetUser+'")';
-var speedVal='100';
-var jumpVal='200';
-if(action==='speed'){
-  var sInput=$('speedValue');
-  if(sInput&&sInput.value)speedVal=Math.max(1,parseFloat(sInput.value)||100).toString();
-}
-if(action==='jump'){
-  var jInput=$('jumpValue');
-  if(jInput&&jInput.value)jumpVal=Math.max(1,parseFloat(jInput.value)||200).toString();
-}
-var scripts={
-speed:'local target='+target+'\nlocal targetchar=target.Character\nlocal targethum=targetchar:FindFirstChildOfClass("Humanoid")\ntargethum.WalkSpeed='+speedVal,
-jump:'local target='+target+'\nlocal targetchar=target.Character\nlocal targethum=targetchar:FindFirstChildOfClass("Humanoid")\nif targethum.JumpPower then targethum.JumpPower='+jumpVal+' elseif targethum.UseJumpPower then targethum.JumpPower='+jumpVal+' else targethum.JumpHeight='+(parseFloat(jumpVal)/4)+' end',
-heal:'local target='+target+'\nlocal targetchar=target.Character\nlocal targethum=targetchar:FindFirstChildOfClass("Humanoid")\ntargethum.Health=targethum.MaxHealth',
-god:'local target='+target+'\nlocal targetchar=target.Character\nlocal targethum=targetchar:FindFirstChildOfClass("Humanoid")\ntargethum.Health=math.huge\ntargethum.MaxHealth=math.huge',
-kill:'local target='+target+'\nlocal targetchar=target.Character\nlocal targethum=targetchar:FindFirstChildOfClass("Humanoid")\ntargethum.Health=0',
-freeze:'local target='+target+'\nlocal targetchar=target.Character\ntargetchar.HumanoidRootPart.Anchored=true',
-thaw:'local target='+target+'\nlocal targetchar=target.Character\ntargetchar.HumanoidRootPart.Anchored=false',
-explode:'local target='+target+'\nlocal targetchar=target.Character\nInstance.new("Explosion",workspace).Position=targetchar.HumanoidRootPart.Position',
-fire:'local target='+target+'\nlocal targetchar=target.Character\nInstance.new("Fire",targetchar.HumanoidRootPart):SetAttribute("AndruxEmitter",true)',
-smoke:'local target='+target+'\nlocal targetchar=target.Character\nInstance.new("Smoke",targetchar.HumanoidRootPart):SetAttribute("AndruxEmitter",true)',
-sparkles:'local target='+target+'\nlocal targetchar=target.Character\nInstance.new("Sparkles",targetchar.HumanoidRootPart):SetAttribute("AndruxEmitter",true)',
-forcefield:'local target='+target+'\nlocal targetchar=target.Character\nInstance.new("ForceField",targetchar)',
-sit:'local target='+target+'\nlocal targetchar=target.Character\nlocal targethum=targetchar:FindFirstChildOfClass("Humanoid")\ntargethum.Sit=true',
-fling:'local target='+target+'\nlocal targetchar=target.Character\nInstance.new("BodyForce",targetchar.HumanoidRootPart).Force=Vector3.new(12550821,12550821,0)',
-invisible:'local target='+target+'\nlocal targetchar=target.Character\nfor _,v in pairs(targetchar:GetDescendants())do if v:IsA("BasePart")or v:IsA("Decal")or v:IsA("Texture")and v.Transparency~=1 then v:SetAttribute("OgTransparency",v.Transparency)v.Transparency=1 end end',
-visible:'local target='+target+'\nlocal targetchar=target.Character\nfor _,v in pairs(targetchar:GetDescendants())do if v:IsA("BasePart")or v:IsA("Decal")or v:IsA("Texture")and v:GetAttribute("OgTransparency")then v.Transparency=v:GetAttribute("OgTransparency")end end',
-kick:'local target='+target+'\ntarget:Kick("Kicked by Andrux Admin")',
-punish:'local target='+target+'\ntarget.Character:Destroy()',
-refresh:'local target='+target+'\nlocal cf\nif target.Character then local h=target.Character:FindFirstChild("Head")if h then cf=h.CFrame end end\ntarget:LoadCharacterAsync()\nif cf then local h=target.Character:WaitForChild("Head")h.CFrame=cf end',
-goto:'local plr=game:GetService("Players").LocalPlayer\nlocal plrchar=plr.Character\nif not plrchar.PrimaryPart then plrchar.PrimaryPart=plrchar:FindFirstChild("HumanoidRootPart")end\nlocal target='+target+'\nlocal targetchar=target.Character\nif not targetchar.PrimaryPart then targetchar.PrimaryPart=targetchar:FindFirstChild("HumanoidRootPart")end\nplrchar:SetPrimaryPartCFrame(targetchar.PrimaryPart.CFrame)',
-bring:'local plr=game:GetService("Players").LocalPlayer\nlocal plrchar=plr.Character\nif not plrchar.PrimaryPart then plrchar.PrimaryPart=plrchar:FindFirstChild("HumanoidRootPart")end\nlocal target='+target+'\nlocal targetchar=target.Character\nif not targetchar.PrimaryPart then targetchar.PrimaryPart=targetchar:FindFirstChild("HumanoidRootPart")end\ntargetchar:SetPrimaryPartCFrame(plrchar.PrimaryPart.CFrame)',
-f3x:'local target='+target+'\nrequire(580330877)().Parent=target.Backpack',
-luger:'local target='+target+'\nlocal tool=game:GetService("InsertService"):LoadAsset(95354288):GetChildren()[1]\ntool.Parent=target.Backpack',
-tripmine:'local target='+target+'\nlocal tool=game:GetService("InsertService"):LoadAsset(11999247):GetChildren()[1]\ntool.Parent=target.Backpack',
-};
-return scripts[action]||null;
+  var form=$('shAddForm');
+  if(form)form.onsubmit=function(e){
+    e.preventDefault();
+    var type=$('cardType').value;
+    var title=$('cardTitle').value.trim();
+    var content=$('cardContent').value.trim();
+    var desc=$('cardDesc').value.trim();
+    var bg=$('cardBg').value.trim();
+    if(!title||!content){toast(tt('sh.need_title_content'));return;}
+    saveCard({type:type,title:title,desc:desc,content:content,bg:bg})
+      .then(function(){
+        closeModal();
+        $('shAddForm').reset();
+        updateContentFieldByType();
+        toast(tt('sh.card_published'));
+        loadCards();
+      })
+      .catch(function(err){toast(tt('sh.save_fail')+err.message);});
+  };
+
+  var search=$('shSearchInput');
+  if(search)search.oninput=render;
 }
 
-window.paAction=function(action){
-var targetUser=($('paTargetUser')?$('paTargetUser').value:'').trim();
-if(!targetUser){toast(tt('sh.enter_player'));return;}
-var script=paBuildScript(action,targetUser);
-if(!script){toast(tt('sh.unknown_action'));return;}
-var labels={speed:tt('sh.act_speed'),jump:tt('sh.act_jump'),heal:tt('sh.act_heal'),god:tt('sh.act_god'),kill:tt('sh.act_kill'),freeze:tt('sh.act_freeze'),thaw:tt('sh.act_thaw'),explode:tt('sh.act_explode'),fire:tt('sh.act_fire'),smoke:tt('sh.act_smoke'),sparkles:tt('sh.act_sparkles'),forcefield:tt('sh.act_forcefield'),sit:tt('sh.act_sit'),fling:tt('sh.act_fling'),invisible:tt('sh.act_invisible'),visible:tt('sh.act_visible'),kick:tt('sh.act_kick'),punish:tt('sh.act_punish'),refresh:tt('sh.act_refresh'),goto:tt('sh.act_goto'),bring:tt('sh.act_bring'),f3x:tt('sh.act_f3x'),luger:tt('sh.act_luger'),tripmine:tt('sh.act_tripmine')};
-var extra='';
-if(action==='speed'&&$('speedValue'))extra=' ('+$('speedValue').value+')';
-if(action==='jump'&&$('jumpValue'))extra=' ('+$('jumpValue').value+')';
-pushScript(script,labels[action]+extra+' -> '+targetUser,'server');
-};
-
-/* ===== Tab switching ===== */
-function setupTabs(){
-var btns=document.querySelectorAll('.sh-tab');
-if(!btns.length)return;
-btns.forEach(function(btn){
-btn.onclick=function(){
-var tab=btn.getAttribute('data-shtab');
-btns.forEach(function(b){b.classList.remove('active');});
-btn.classList.add('active');
-var messages=$('shMessagesPanel');
-var actions=$('shActionsPanel');
-if(tab==='messages'){
-if(messages)messages.style.display='';
-if(actions)actions.style.display='none';
-}else{
-if(messages)messages.style.display='none';
-if(actions)actions.style.display='';
-}
-};
-});
-}
-
-/* ===== Init ===== */
 function init(){
-loadServers();
-setupTabs();
-applyI18n();
-if(!window._shServerInterval){window._shServerInterval=setInterval(loadServers,5000);}
+  initUI();
+  loadServers();
+  loadCards();
+  setInterval(loadServers,30000);
 }
 
-if(document.readyState==='loading'){
-document.addEventListener('DOMContentLoaded',init);
-}else{
-init();
-}
-setTimeout(init,300);
-setTimeout(init,1000);
-setTimeout(init,3000);
+if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',init);}
+else{init();}
 
-/* Refresh server list when hide-offline setting changes */
-window.addEventListener('storage',function(e){
-  if(e.key==='andrux_hide_offline'){loadServers();}
-  if(e.key==='andrux_lang'){setTimeout(applyI18n,50);loadServers();}
+window.AndruxHub={reload:loadCards,execute:executeCard};
+window.addEventListener('andrux_lang_change',function(){
+  try{
+    updateContentFieldByType();
+    loadServers();
+    render();
+  }catch(e){}
 });
-window.addEventListener('andrux_hide_offline_change',function(){loadServers();});
 
-window.AxScriptHub={reload:loadServers};
 })();

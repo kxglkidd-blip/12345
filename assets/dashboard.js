@@ -95,8 +95,8 @@ var execCount=0;
 var _loading=false;
 
 /* ===== Load games from Supabase (BUG FIX: was reading localStorage only) ===== */
-/* Filter: status=online AND hidden=false AND heartbeat fresh (truly online) */
-var STALE_MS=40000; /* server heartbeats ~every 30s; no beat within 40s = offline */
+/* Filter: status=online AND hidden=false AND heartbeat within 5 min (truly online) */
+var STALE_MS=5*60*1000; /* 5 minutes without heartbeat = offline */
 function isGameAlive(g){
   if(!g||g.status!=='online')return false;
   if(!g.last_heartbeat)return false;
@@ -261,14 +261,15 @@ function joinRandomGame(){
 }
 
 /* ===== Roblox username binding ===== */
-/* Roblox's public APIs send no CORS headers, so a renderer fetch() from a file:// page is
-   blocked. In the desktop build these lookups go through the main process (no CORS). */
+/* Roblox 官方接口没有 CORS 头，渲染进程（file:// 源）直连会被浏览器拦下，桌面版走主进程代理；
+   纯网页版只能改用带 CORS 的搜索接口。 */
 function rbxJson(url,opts,ms){
+  ms=ms||8000;
   var d=window.andruxDesktop;
   if(d&&typeof d.robloxJson==='function'){
-    var timer;
-    var timeout=new Promise(function(_,rej){timer=setTimeout(function(){rej(new Error('timeout'));},ms||6000);});
-    return Promise.race([d.robloxJson(url,opts||{}),timeout]).then(function(v){clearTimeout(timer);return v;},function(e){clearTimeout(timer);throw e;});
+    var o=opts||{};
+    o.timeout=ms;
+    return d.robloxJson(url,o);
   }
   return fetchT(url,opts,ms).then(function(r){
     if(!r.ok)throw new Error('HTTP '+r.status);
@@ -277,25 +278,24 @@ function rbxJson(url,opts,ms){
 }
 
 function resolveRobloxUserId(username){
-  /* Failure returns null and never blocks binding. Roblox's own host sends no CORS header, so a
-     browser starts at index 1 and relies on the CORS-enabled mirrors. */
+  /* 失败/限流/超时一律返回 null，不阻塞绑定 */
   function postAt(i){
     if(i>=ROBLOX_ID_APIS.length)return Promise.reject(new Error('not found'));
     return rbxJson(ROBLOX_ID_APIS[i],{
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify({usernames:[username],excludeBannedUsers:false})
-    },6000).then(function(data){
+    },8000).then(function(data){
       if(data&&data.data&&data.data[0]&&data.data[0].id)return data.data[0].id;
       throw new Error('not found');
     }).catch(function(){return postAt(i+1);});
   }
-  /* Search returns fuzzy matches, so require an exact name match. */
+  /* 搜索是模糊匹配，必须要求用户名完全一致，避免绑错人 */
   function searchAt(i){
     if(i>=ROBLOX_SEARCH_APIS.length)return Promise.reject(new Error('not found'));
     return rbxJson(ROBLOX_SEARCH_APIS[i]+'?keyword='+encodeURIComponent(username)+'&limit=10',{
       headers:{Accept:'application/json'}
-    },6000).then(function(data){
+    },8000).then(function(data){
       var list=(data&&data.data)||[];
       var key=String(username).toLowerCase();
       for(var k=0;k<list.length;k++){
@@ -305,6 +305,7 @@ function resolveRobloxUserId(username){
     }).catch(function(){return searchAt(i+1);});
   }
   var direct=!!(window.andruxDesktop&&typeof window.andruxDesktop.robloxJson==='function');
+  /* 浏览器版跳过官方主机：它不发 CORS 头，那个请求必然失败 */
   return postAt(direct?0:1).catch(function(){return searchAt(0);}).catch(function(){return null;});
 }
 
@@ -459,9 +460,9 @@ function init(){
   prefillBoundUser();
   refreshAll();
 
-  // Periodic refresh every 10 seconds
+  // Periodic refresh every 15 seconds
   if(!window._dashInterval){
-    window._dashInterval=setInterval(refreshAll,10000);
+    window._dashInterval=setInterval(refreshAll,15000);
   }
 }
 

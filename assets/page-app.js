@@ -9,6 +9,7 @@ var T_USERS='ax_u7';
 var T_MSGS='ax_m9';
 var T_CONFIG='ax_c3';
 var T_GAMES='ax_gs';
+var T_HUB='ax_hub_scripts';
 var ADMIN_HASH_PARTS=[0x2a,0xdb,0xa7,0x8f,0x2b,0x0e,0x1d,0x27,0x1e,0x57,0x7e,0x4b,0x12,0xf6,0x6d,0xd2,0x38,0x25,0x7a,0xcd,0xad,0xc1,0xd9,0x0c,0xc1,0x2d,0x15,0xbc,0xde,0x01,0xc4,0x3e];
 
 /* i18n helper — translate key via global I18N engine */
@@ -982,6 +983,8 @@ if(chSelect)chSelect.addEventListener('change',loadAdminMessages);
 /* Refresh buttons */
 var refreshGames=$('adminRefreshGames');
 if(refreshGames)refreshGames.addEventListener('click',loadAdminGames);
+var refreshHub=$('adminRefreshHub');
+if(refreshHub)refreshHub.addEventListener('click',loadAdminHubCards);
 var showHidden=$('adminShowHiddenGames');
 if(showHidden)showHidden.addEventListener('change',loadAdminGames);
 var refreshUsers=$('adminRefreshUsers');
@@ -999,7 +1002,7 @@ else el.textContent=t('admin.mute_status_expired');}
 }).catch(function(){el.textContent=t('admin.mute_status_error');});
 }
 
-function loadAdminData(){loadAdminGames();loadAdminUsers();loadAdminMessages();}
+function loadAdminData(){loadAdminGames();loadAdminHubCards();loadAdminUsers();loadAdminMessages();}
 
 function loadAdminGames(){
 var container=$('adminGames');if(!container)return;
@@ -1017,6 +1020,29 @@ return '<div class="admin-item" data-id="'+escapeAttr(g.id)+'">'+
 '<div class="admin-actions">'+
 '<button class="'+statusCls+'" data-action="toggle-game" data-gid="'+escapeAttr(g.id)+'" data-hidden="'+!isHidden+'">'+statusText+'</button>'+
 '</div></div>';}).join('');}).catch(function(){container.innerHTML='<div class="notice bad">'+t('admin.load_fail')+'</div>';});}
+
+
+function loadAdminHubCards(){
+var container=$('adminHubCards');if(!container)return;
+api(T_HUB,'?select=*&order=created_at.desc&limit=100').then(function(rows){
+if(!rows||!rows.length){container.innerHTML='<div class="notice">'+t('admin.no_hub_cards')+'</div>';return;}
+container.innerHTML=rows.map(function(card){
+var typeLabel=card.type==='require'?t('admin.hub_type_require'):t('admin.hub_type_script');
+var title=card.title||'Untitled';
+var author=card.author||'';
+var desc=card.description||'';
+var content=card.content||'';
+var created=card.created_at?new Date(card.created_at).toLocaleString(window.I18N&&window.I18N.lang==='en'?'en-US':'zh-CN'):'';
+return '<div class="admin-item" data-hub-id="'+escapeAttr(String(card.id))+'">'+
+'<div class="admin-item-top"><b>'+escapeHTML(title)+' <small style="color:var(--muted);font-weight:400">['+escapeHTML(typeLabel)+']</small></b><span>'+escapeHTML(created)+'</span></div>'+
+'<div style="font-size:12px;color:var(--muted);margin:4px 0">'+(author?escapeHTML(author)+' · ':'')+(desc?escapeHTML(String(desc).slice(0,80)):'')+'</div>'+
+'<div style="font-size:11px;font-family:var(--font-mono);color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%">'+escapeHTML(String(content).slice(0,120))+'</div>'+
+'<div class="admin-actions" style="margin-top:8px">'+
+'<button class="mini-btn danger" data-action="delete-hub" data-hid="'+escapeAttr(String(card.id))+'">'+t('admin.delete_hub')+'</button>'+
+'</div></div>';
+}).join('');
+}).catch(function(){container.innerHTML='<div class="notice bad">'+t('admin.load_fail')+'</div>';});
+}
 
 function loadAdminUsers(){
 var container=$('adminUsers');if(!container)return;
@@ -1117,6 +1143,16 @@ toast(hide?t('toast.game_hidden'):t('toast.game_restored'));loadAdminGames();
 }).catch(function(){toast(t('toast.op_fail'));});
 }
 
+
+if(action==='delete-hub'){
+var hid=btn.dataset.hid;
+if(!hid)return;
+if(!confirm(t('admin.confirm_delete_hub')))return;
+api(T_HUB,'?id=eq.'+encodeURIComponent(hid),{method:'DELETE'}).then(function(){
+toast(t('toast.hub_deleted'));loadAdminHubCards();
+}).catch(function(){toast(t('toast.delete_fail'));});
+}
+
 if(action==='delete-user-msgs'&&uid){
 if(!confirm(t('misc.confirm_clear_msgs')))return;
 api(T_MSGS,'?c1=eq.'+encodeURIComponent(uid),{method:'DELETE'}).then(function(){
@@ -1205,35 +1241,133 @@ toast(t('toast.lang_updated'));
 }
 
 /* ===== Game page ===== */
-/* Server sends a heartbeat roughly every 30s; if none arrives within this window the game is offline. */
-var HEARTBEAT_STALE_MS=40000;
 function initGame(){
 if(!requireSession())return;
 loadGameStatus();
-gameTimer=setInterval(loadGameStatus,5000);
+gameTimer=setInterval(loadGameStatus,10000);
+}
+
+/* Cover art: the heartbeat used to fetch the game icon through a mirror that is now dead, so
+   rows can carry an empty or stale cover_image_url. Icons are resolved straight from Roblox
+   here instead — batched per place id and cached — which also repairs rows already stored. */
+var COVER_CACHE={};
+try{COVER_CACHE=JSON.parse(localStorage.getItem('andrux_cover_cache_v1')||'{}')||{};}catch(e){COVER_CACHE={};}
+var _coverSaveT=null;
+function saveCoverCache(){
+clearTimeout(_coverSaveT);
+_coverSaveT=setTimeout(function(){try{localStorage.setItem('andrux_cover_cache_v1',JSON.stringify(COVER_CACHE));}catch(e){}},400);
+}
+function cachedCover(placeId){
+var c=COVER_CACHE[String(placeId||'')];
+return(c&&c.url&&(Date.now()-c.t)<86400000)?c.url:'';
+}
+/* A row's stored cover can point at a mirror that has since died, so a freshly resolved
+   Roblox icon wins; the stored url is only a fallback while resolution is still pending. */
+function coverOf(g){return cachedCover(g.place_id)||safeURL(g.cover_image_url);}
+function iconRequest(url){
+var d=window.andruxDesktop;
+if(d&&typeof d.robloxJson==='function')return d.robloxJson(url,{timeout:9000});
+return fetch(url,{headers:{Accept:'application/json'}}).then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.json();});
+}
+function resolveCovers(placeIds){
+var need=[],seen={},i;
+for(i=0;i<placeIds.length;i++){
+var id=String(placeIds[i]||'');
+if(!id||seen[id]||cachedCover(id))continue;
+seen[id]=1;need.push(id);
+}
+if(!need.length)return Promise.resolve(false);
+var got=0;
+function pick(data){
+var arr=(data&&data.data)||[];
+for(var k=0;k<arr.length;k++){
+var it=arr[k];
+if(it&&it.imageUrl){COVER_CACHE[String(it.targetId)]={url:it.imageUrl,t:Date.now()};got++;}
+}
+saveCoverCache();
+}
+function ask(host){
+return iconRequest('https://'+host+'/v1/places/gameicons?placeIds='+need.join(',')+
+'&returnPolicy=PlaceHolder&size=512x512&format=Png&isCircular=false');
+}
+return ask('thumbnails.roblox.com')
+.then(pick,function(){return ask('thumbnails.ff-roproxy.com').then(pick,function(){return ask('thumbnails.rotunnel.com').then(pick,function(){});});})
+.then(function(){return got>0;});
+}
+
+/* The heartbeat resolves the author name through a mirror that keeps going down, so a row can
+   store an empty creator_name even though creator_id is known. Resolve the name straight from
+   Roblox (the desktop build has a working proxy) and use it as a display fallback. */
+var CREATOR_CACHE={};
+try{CREATOR_CACHE=JSON.parse(localStorage.getItem('andrux_creator_cache_v1')||'{}')||{};}catch(e){CREATOR_CACHE={};}
+var _creatorSaveT=null;
+function saveCreatorCache(){
+clearTimeout(_creatorSaveT);
+_creatorSaveT=setTimeout(function(){try{localStorage.setItem('andrux_creator_cache_v1',JSON.stringify(CREATOR_CACHE));}catch(e){}},400);
+}
+function cachedCreator(id,type){
+var c=CREATOR_CACHE[type+':'+String(id||'')];
+return(c&&c.name&&(Date.now()-c.t)<86400000)?c.name:'';
+}
+function resolveCreatorName(id,type){
+id=String(id||'');if(!id)return Promise.resolve('');
+type=(type==='group')?'group':'user';
+var cached=cachedCreator(id,type);if(cached)return Promise.resolve(cached);
+var isGroup=(type==='group');
+var hosts=isGroup?['groups.roblox.com','groups.ff-roproxy.com','groups.rotunnel.com']
+                 :['users.roblox.com','users.ff-roproxy.com','users.rotunnel.com'];
+var path=isGroup?('/v1/groups/'+id):('/v1/users/'+id);
+function tryHost(i){
+if(i>=hosts.length)return Promise.resolve('');
+return iconRequest('https://'+hosts[i]+path).then(function(d){
+var name=(d&&(d.name||d.displayName))||'';
+if(!name)throw new Error('no name');
+CREATOR_CACHE[type+':'+id]={name:name,t:Date.now()};saveCreatorCache();
+return name;
+},function(){return tryHost(i+1);});
+}
+return tryHost(0);
+}
+function resolveCreators(rows){
+var jobs=[],i;
+for(i=0;i<rows.length;i++){
+var r=rows[i];
+if(!r||r.creator_name||!r.creator_id)continue;
+(function(row){
+jobs.push(resolveCreatorName(row.creator_id,row.creator_type).then(function(name){if(name)row.creator_name=name;}));
+})(r);
+}
+if(!jobs.length)return Promise.resolve(false);
+return Promise.all(jobs).then(function(){return true;});
 }
 
 function loadGameStatus(){
 var box=$('gameStatusBox');if(!box)return;
 api(T_GAMES,'?select=*&hidden=eq.false&order=last_heartbeat.desc&limit=50').then(function(rows){
 if(!rows||!rows.length){box.innerHTML='<div class="notice">'+t('game.no_data')+'</div>';return;}
+drawGameCards(box,rows);
+var ids=[];
+for(var i=0;i<rows.length;i++)ids.push(rows[i].place_id);
+return Promise.all([resolveCovers(ids),resolveCreators(rows)]).then(function(res){if(res[0]||res[1])drawGameCards(box,rows);});
+}).catch(function(err){box.innerHTML='<div class="notice">'+t('game.load_error')+'</div>';});
+}
+
+function drawGameCards(box,rows){
 var now=Date.now();
 box.innerHTML='<div class="games-grid">'+rows.map(function(g){
-var isOnline=g.status==='online'&&(now-new Date(g.last_heartbeat).getTime())<HEARTBEAT_STALE_MS;
-var cls=isOnline?'gc gc-has-bg':'gc gc-has-bg gc-offline';
-var hasBg=g.cover_image_url&&g.cover_image_url.length>5;
-var safeBg=safeURL(g.cover_image_url);
-if(!hasBg||!safeBg)cls=cls.replace('gc-has-bg','gc-no-bg');
-var bgStyle=(hasBg&&safeBg)?"background-image:url('"+safeBg.replace(/'/g,'')+"');background-size:cover;background-position:center;background-repeat:no-repeat;":'';
+var isOnline=g.status==='online'&&(now-new Date(g.last_heartbeat).getTime())<60000;
+var cover=coverOf(g);
+var cls='gc gc-clickable'+(isOnline?'':' gc-offline')+(cover?' gc-has-bg':' gc-no-bg');
 var rawJoin=g.join_url||('roblox://placeId='+g.place_id);
 var joinHref=safeURL(rawJoin)||('roblox://placeId='+escapeAttr(g.place_id));
 var joinDisabled=isOnline?'':'pointer-events:none;opacity:0.4;';
 var statusHtml=isOnline?'<span class="gc-status gc-online">'+t('game.online')+'</span>':'<span class="gc-status gc-offline">'+t('game.offline')+'</span>';
-return '<div class="'+cls+'">'+
-'<div class="gc-bg" style="'+bgStyle+'"></div>'+
+var gd={place_id:g.place_id||'',name:g.game_name||'',desc:g.description||'',cover:cover,join:joinHref,players:g.player_count||0,max:g.max_players||0,creator:g.creator_name||'',creator_type:g.creator_type||'',creator_id:g.creator_id||'',priv:!!g.is_private_server,priv_owner:g.private_server_owner||'',priv_name:g.private_server_name||'',priv_id:g.private_server_id||'',server_name:g.server_name||'',job_id:g.job_id||'',hb:g.last_heartbeat||'',online:isOnline?1:0};
+return '<div class="'+cls+'" data-gd="'+escapeAttr(JSON.stringify(gd))+'" role="button" tabindex="0">'+
+'<div class="gc-bg">'+(cover?'<img class="gc-bg-img" alt="" data-pid="'+escapeAttr(g.place_id||'')+'" src="'+escapeAttr(cover)+'">':'')+'</div>'+
 '<div class="gc-ov"></div>'+
 '<div class="gc-body">'+
-'<div class="gc-top-row">'+statusHtml+'</div>'+
+'<div class="gc-top-row">'+statusHtml+'<span class="gc-detail-hint">'+t('gdetail.open')+'</span></div>'+
 '<h3 class="gc-title">'+escapeHTML(g.game_name||'Unknown')+'</h3>'+
 '<p class="gc-desc">'+escapeHTML(g.description||'')+'</p>'+
 '<div class="gc-foot">'+
@@ -1244,16 +1378,22 @@ return '<div class="'+cls+'">'+
 '<a class="gc-join" href="'+escapeAttr(joinHref)+'" target="_blank" rel="noopener" style="'+joinDisabled+'">'+t('game.join')+'</a>'+
 '</div></div></div>';
 }).join('')+'</div>';
-}).catch(function(err){box.innerHTML='<div class="notice">'+t('game.load_error')+'</div>';});
+/* A cover that fails to load must not leave a dark slab behind — drop to the plain card. */
+box.querySelectorAll('.gc-bg-img').forEach(function(img){
+img.addEventListener('error',function(){
+var pid=img.getAttribute('data-pid')||'';
+var alt=cachedCover(pid);
+/* The stored cover died: swap in the Roblox-resolved icon once before giving up. */
+if(alt&&img.getAttribute('src')!==alt&&!img._altTried){img._altTried=true;img.setAttribute('src',alt);return;}
+var card=img.closest?img.closest('.gc'):null;
+if(card){card.classList.remove('gc-has-bg');card.classList.add('gc-no-bg');}
+img.style.display='none';
+});
+});
 }
 
 /* ===== Executor ===== */
 var execSelectedPlaceId=null;
-var execGameTimer=null;
-function startExecGameRefresh(){
-if(execGameTimer)return;
-execGameTimer=setInterval(loadExecGames,5000);
-}
 function initExecutor(){
 if(!requireSession())return;
 var lock=$('execLock');
@@ -1262,7 +1402,7 @@ var form=$('execLoginForm');
 if(!lock||!panel||!form)return;
 
 if(sessionStorage.getItem('andrux_admin_ok')==='1'){
-lock.classList.add('hidden');panel.classList.remove('hidden');loadExecGames();startExecGameRefresh();
+lock.classList.add('hidden');panel.classList.remove('hidden');loadExecGames();
 }
 
 form.addEventListener('submit',function(e){
@@ -1272,7 +1412,7 @@ hashText(pw.toLowerCase()).then(function(hash){
 if(hash===getAdminHash()){
 sessionStorage.setItem('andrux_admin_ok','1');
 lock.classList.add('hidden');panel.classList.remove('hidden');
-toast(t('toast.password_ok'));loadExecGames();startExecGameRefresh();
+toast(t('toast.password_ok'));loadExecGames();
 }else{setNotice($('execNotice'),t('toast.password_err'),'bad');}
 });
 });
@@ -1299,7 +1439,7 @@ api(T_GAMES,'?select=place_id,game_name,status,last_heartbeat,player_count&hidde
 if(!rows||!rows.length){container.innerHTML='<div class="notice">'+t('exec.no_games')+'</div>';return;}
 var now=Date.now();
 container.innerHTML=rows.map(function(g){
-var isOnline=g.status==='online'&&(now-new Date(g.last_heartbeat).getTime())<HEARTBEAT_STALE_MS;
+var isOnline=g.status==='online'&&(now-new Date(g.last_heartbeat).getTime())<60000;
 var cls=isOnline?'exec-game-item':'exec-game-item offline';
 if(g.place_id===execSelectedPlaceId)cls+=' selected';
 var statusHtml=isOnline?'<span class="exec-game-status online">'+t('game.online')+'</span>':'<span class="exec-game-status offline">'+t('game.offline')+'</span>';
@@ -1345,12 +1485,12 @@ try {
   localStorage.setItem('andrux_total_execs', String(cur + 1));
   window.dispatchEvent(new Event('storage'));
 } catch(e) {}
-setNotice(status,t('misc.script_pushed')+execSelectedPlaceId+t('misc.push_wait'),'ok');
+setNotice(status,t('exec.success')||'执行成功','ok');
 toast(t('toast.script_pushed'));
 }).catch(function(err){
 setNotice(status,t('misc.push_fail')+(err.message||t('misc.unknown_err')),'bad');
 }).finally(function(){
-if(sendBtn){sendBtn.disabled=false;sendBtn.textContent=t('exec.execute');sendBtn.style.opacity='';}
+if(sendBtn){sendBtn.disabled=false;sendBtn.textContent=t('exec.execute')||'执行';sendBtn.style.opacity='';}
 });
 }
 

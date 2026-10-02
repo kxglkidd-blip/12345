@@ -1,4 +1,4 @@
-/* Andrux Patches - Admin IP ban/unban, player list IP lock/unlock */
+﻿/* Andrux Patches - Admin IP ban/unban, player list IP lock/unlock */
 (function(){
 'use strict';
 var _d=function(s){return atob(s);};
@@ -669,6 +669,7 @@ setTimeout(function(){loadTitles(function(){injectMessageTitles();injectProfileT
 /* ===== Game Page Fixes: broken cover images + offline player count zero ===== */
 (function(){
 'use strict';
+var STALE_MS=5*60*1000; /* 5 min */
 
 function fixGameCard(card){
   if(!card||card._gxFixed)return;
@@ -715,7 +716,280 @@ setTimeout(scanAndFix,1500);
 setTimeout(scanAndFix,3000);
 setInterval(scanAndFix,10000);
 })();
+/* ===== Game detail modal — click a game card (server list) ===== */
+(function(){
+'use strict';
+var SU='https://nyourvnfzhxbofwmavgq.supabase.co';
+var SK='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im55b3Vydm5memh4Ym9md21hdmdxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUwOTYwMTIsImV4cCI6MjEwMDY3MjAxMn0.YqztdjSz8kDAf9sHpqVeiMLjfwSbl4kvc8O5sGyJkvg';
+var MID='gdMask';
+var STALE=45000;
+var _gd=null,_list=null;
 
+function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function safeU(u){var s=String(u||'').trim();if(/^https?:\/\/.+/i.test(s))return s;if(/^roblox:\/\//i.test(s))return s;return '';}
+function tr(key,ph,val){var s=tt(key);return ph&&s.indexOf(ph)!==-1?s.split(ph).join(val):s;}
+function tr2(key,p1,v1,p2,v2){var s=tt(key);if(s.indexOf(p1)!==-1)s=s.split(p1).join(v1);if(s.indexOf(p2)!==-1)s=s.split(p2).join(v2);return s;}
+function alive(hb){if(!hb)return false;var t=new Date(hb).getTime();return !isNaN(t)&&(Date.now()-t)<=STALE;}
 
+var ICO={
+close:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>',
+copy:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2.4"/><path d="M15 5.6A2.6 2.6 0 0 0 12.4 3H5.6A2.6 2.6 0 0 0 3 5.6v6.8A2.6 2.6 0 0 0 5.6 15"/></svg>',
+play:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.2v13.6a.8.8 0 0 0 1.22.68l11.06-6.8a.8.8 0 0 0 0-1.36L9.22 4.52A.8.8 0 0 0 8 5.2z"/></svg>'
+};
+
+/* Counters roll up from zero so the panel reads as "live" the moment it opens. */
+function countUp(el,to){
+  if(!el)return;
+  var end=Math.max(0,Number(to)||0);
+  if(el._raf)cancelAnimationFrame(el._raf);
+  if(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches){el.textContent=String(end);return;}
+  var start=null,dur=640;
+  function step(ts){
+    if(start===null)start=ts;
+    var p=Math.min(1,(ts-start)/dur);
+    el.textContent=String(Math.round(end*(1-Math.pow(1-p,3))));
+    if(p<1)el._raf=requestAnimationFrame(step);
+  }
+  el._raf=requestAnimationFrame(step);
+}
+
+/* One pass over the rows feeds both the header line and the three stat blocks. */
+function statsOf(list,gd){
+  var real=!!(list.length&&!list[0]._fallback);
+  var players=0,priv=0,online=0;
+  var liveServers = 0;
+  for(var i=0;i<list.length;i++){
+    var s=list[i];
+    var isLive = alive(s.last_heartbeat)||(s._fallback&&gd.online);
+    if(isLive) {
+      liveServers++;
+      if(real)players+=(Number(s.player_count)||0);
+      if(s.is_private_server)priv++;
+      online++;
+    }
+  }
+  if(!real)players=Number(gd.players)||0;
+  return {players:players,priv:priv,online:online,servers:liveServers};
+}
+
+function build(){
+  var old=document.getElementById(MID);
+  if(old)return old;
+  var mask=document.createElement('div');
+  mask.id=MID;
+  mask.className='gd-mask';
+  mask.innerHTML=
+  '<div class="gd-card" role="dialog" aria-modal="true">'+
+    '<div class="gd-cover"><div class="gd-cover-img"></div></div>'+
+    '<button class="gd-close" type="button">'+ICO.close+'</button>'+
+    '<div class="gd-main">'+
+      '<h3 class="gd-title" id="gdTitle"></h3>'+
+      '<p class="gd-meta" id="gdMeta1"></p>'+
+      '<p class="gd-meta" id="gdMeta2"></p>'+
+      '<div class="gd-stats" id="gdStats"></div>'+
+      '<div class="gd-servers" id="gdServers"></div>'+
+      '<div class="gd-foot"><button class="gd-end" id="gdEnd" type="button"></button></div>'+
+    '</div>'+
+  '</div>';
+  document.body.appendChild(mask);
+  mask.addEventListener('click',function(e){if(e.target===mask)close();});
+  mask.querySelector('.gd-close').addEventListener('click',close);
+  mask.querySelector('#gdEnd').addEventListener('click',close);
+  mask.querySelector('#gdServers').addEventListener('click',function(e){
+    var btn=e.target.closest?e.target.closest('.gd-copy'):null;
+    if(!btn)return;
+    copyText(btn.getAttribute('data-copy')||'',btn);
+  });
+  document.addEventListener('keydown',function(e){if(e.key==='Escape'&&mask.classList.contains('open'))close();});
+  return mask;
+}
+
+function legacyCopy(text){
+  try{
+    var ta=document.createElement('textarea');
+    ta.value=text;ta.style.position='fixed';ta.style.left='-9999px';
+    document.body.appendChild(ta);ta.select();document.execCommand('copy');
+    document.body.removeChild(ta);
+  }catch(e){}
+}
+function copyText(text,btn){
+  if(!text)return;
+  var done=function(){
+    btn.classList.add('done');
+    btn.setAttribute('title',tt('gdetail.copied'));
+    clearTimeout(btn._t);
+    btn._t=setTimeout(function(){btn.classList.remove('done');btn.setAttribute('title',tt('gdetail.copy'));},1400);
+  };
+  if(navigator.clipboard&&navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text).then(done,function(){legacyCopy(text);done();});
+  }else{legacyCopy(text);done();}
+}
+
+function close(){
+  var m=document.getElementById(MID);
+  if(!m||!m.classList.contains('open')||m.classList.contains('gd-leave'))return;
+  m.classList.add('gd-leave');
+  setTimeout(function(){m.classList.remove('open','gd-leave');},190);
+}
+
+/* Row = 服务器名字 / 服务器ID / 服务器作者 / 玩家数, so every field the panel promises
+   is readable without opening the game. */
+function srvRow(s,pubNo,gd,idx){
+  var priv=!!s.is_private_server;
+  var on=alive(s.last_heartbeat)||(s._fallback&&gd.online);
+  var sid=s.job_id||s.private_server_id||'';
+  var name=priv?(s.private_server_name||s.server_name||s.private_server_owner||tt('gdetail.server_private'))
+               :(s.server_name||tr('gdetail.server_no','{n}',String(pubNo)));
+  var author=s.creator_name||s.private_server_owner||gd.creator||'';
+  var pc=Number(s.player_count)||0;
+  var mx=Number(s.max_players)||0;
+  var players=mx?tr2('gdetail.players_cap','{n}',String(pc),'{m}',String(mx)):tr('gdetail.players_n','{n}',String(pc));
+  var instId=priv?(s.private_server_id||sid):sid;
+  var href=instId?('roblox://placeId='+encodeURIComponent(gd.place_id)+'&gameInstanceId='+encodeURIComponent(instId)):safeU(gd.join);
+  var tags=priv?' <span class="gd-tag">'+esc(tt('gdetail.server_private'))+'</span>':'';
+  if(priv&&s.private_server_owner&&s.private_server_owner!==name)tags+=' <span class="gd-tag">'+esc(s.private_server_owner)+'</span>';
+  return '<div class="gd-srv" style="animation-delay:'+(120+idx*55)+'ms">'+
+    '<div class="gd-srv-info">'+
+      '<span class="gd-srv-name"><i class="gd-dot '+(on?'on':'off')+'"></i>'+esc(name)+tags+'</span>'+
+      '<span class="gd-srv-id"><em>'+esc(tt('gdetail.server_id'))+'</em> '+esc(sid||'\u2014')+'</span>'+
+      '<span class="gd-srv-sub"><em>'+esc(tt('gdetail.server_author'))+'</em> '+
+        (author?'<b>'+esc(author)+'</b>':'\u2014')+'<i>\u00b7</i>'+esc(players)+
+      '</span>'+
+    '</div>'+
+    '<div class="gd-srv-acts">'+
+      '<button class="gd-copy" type="button" data-copy="'+esc(sid)+'" title="'+esc(tt('gdetail.copy'))+'">'+ICO.copy+'</button>'+
+      '<a class="gd-joinbtn'+(on?'':' off')+'" href="'+esc(href)+'" target="_blank" rel="noopener">'+ICO.play+esc(tt('gdetail.join'))+'</a>'+
+    '</div>'+
+  '</div>';
+}
+
+function render(gd,list){
+  var mask=build();
+  var cover=safeU(gd.cover);
+  mask.querySelector('.gd-cover-img').style.backgroundImage=cover?"url('"+cover.replace(/'/g,'')+"')":'';
+  mask.querySelector('.gd-card').classList.toggle('gd-no-cover',!cover);
+
+  mask.querySelector('#gdTitle').textContent=gd.name||'Unknown';
+  mask.querySelector('#gdMeta1').innerHTML=
+    esc(tt('gdetail.place_id'))+': <b>'+esc(gd.place_id||'\u2014')+'</b> \u00b7 '+
+    esc(tt('gdetail.author'))+': <b>'+(gd.creator?esc(gd.creator):'\u2014')+'</b>';
+
+  var st=statsOf(list,gd);
+  mask.querySelector('#gdMeta2').textContent=
+    tr('gdetail.players_n','{n}',String(st.players))+' \u00b7 '+
+    tr('gdetail.online_n','{n}',String(st.online))+' \u00b7 '+
+    tr('gdetail.private_n','{n}',String(st.priv));
+
+  var stats=mask.querySelector('#gdStats');
+  stats.innerHTML=
+    '<div class="gd-stat" style="animation-delay:60ms"><b data-c="'+st.players+'">0</b><span>'+esc(tt('gdetail.stat_players'))+'</span></div>'+
+    '<div class="gd-stat" style="animation-delay:120ms"><b data-c="'+st.priv+'">0</b><span>'+esc(tt('gdetail.stat_private'))+'</span></div>'+
+    '<div class="gd-stat" style="animation-delay:180ms"><b data-c="'+st.servers+'">0</b><span>'+esc(tt('gdetail.stat_servers'))+'</span></div>';
+  stats.querySelectorAll('b[data-c]').forEach(function(b){countUp(b,Number(b.getAttribute('data-c'))||0);});
+
+  var box=mask.querySelector('#gdServers');
+  /* Strictly filter out offline zombie records so only live green-dot servers are displayed */
+  var activeList = list.filter(function(s){
+    return alive(s.last_heartbeat) || (s._fallback && gd.online);
+  });
+  if(!activeList.length){
+    box.innerHTML='<div class="gd-empty">'+esc(tt('gdetail.no_servers'))+'</div>';
+  }else{
+    var html='',pubNo=0;
+    for(var i=0;i<activeList.length;i++){
+      if(!activeList[i].is_private_server)pubNo++;
+      html+=srvRow(activeList[i],pubNo,gd,i);
+    }
+    box.innerHTML=html;
+  }
+  mask.querySelector('#gdEnd').textContent=tt('gdetail.end');
+}
+
+function fallbackList(gd){
+  return [{job_id:gd.job_id||'',is_private_server:!!gd.priv,private_server_id:gd.priv_id||'',
+           private_server_owner:gd.priv_owner||'',player_count:gd.players||0,
+           last_heartbeat:gd.hb||'',_fallback:true}];
+}
+
+function cleanupZombieServers(placeId){
+  try {
+    /* Delete stale servers older than 90 seconds from database so they do not accumulate */
+    var expireTime = new Date(Date.now() - 90000).toISOString();
+    var q = placeId ? ('&place_id=eq.' + encodeURIComponent(placeId)) : '';
+    fetch(SU + '/rest/v1/ax_servers?last_heartbeat=lt.' + encodeURIComponent(expireTime) + q, {
+      method: 'DELETE',
+      headers: {apikey: SK, Authorization: 'Bearer ' + SK}
+    }).catch(function(){});
+  } catch(e){}
+}
+
+function loadServers(placeId){
+  if(!placeId)return Promise.resolve(null);
+  cleanupZombieServers(placeId);
+  /* Only fetch active servers with heartbeat in the last 60 seconds */
+  var cutoff = new Date(Date.now() - 60000).toISOString();
+  return fetch(SU+'/rest/v1/ax_servers?select=*&place_id=eq.'+encodeURIComponent(placeId)+'&last_heartbeat=gte.'+encodeURIComponent(cutoff)+'&order=last_heartbeat.desc.nullslast&limit=20',
+    {headers:{apikey:SK,Authorization:'Bearer '+SK}})
+    .then(function(r){
+      if(!r.ok) {
+        /* Fallback without heartbeat filter if query syntax fails */
+        return fetch(SU+'/rest/v1/ax_servers?select=*&place_id=eq.'+encodeURIComponent(placeId)+'&order=last_heartbeat.desc.nullslast&limit=20',
+          {headers:{apikey:SK,Authorization:'Bearer '+SK}}).then(function(res){return res.ok ? res.json() : null;});
+      }
+      return r.json();
+    })
+    .then(function(rows){
+      if(!rows || !rows.length) return null;
+      /* Filter out all offline / zombie servers strictly in memory */
+      var activeRows = rows.filter(function(s){ return alive(s.last_heartbeat); });
+      return activeRows.length ? activeRows : null;
+    })
+    .catch(function(){return null;});
+}
+
+function open(gd){
+  _gd=gd;
+  _list=fallbackList(gd);
+  render(gd,_list);
+  var mask=document.getElementById(MID);
+  if(mask)mask.classList.add('open');
+  loadServers(gd.place_id).then(function(rows){
+    if(_gd!==gd)return;
+    var m=document.getElementById(MID);
+    if(!m||!m.classList.contains('open'))return;
+    _list=(rows&&rows.length)?rows:fallbackList(gd);
+    render(gd,_list);
+  });
+}
+
+function openFromCard(card){
+  var raw=card.getAttribute('data-gd');
+  if(!raw)return;
+  var gd=null;
+  try{gd=JSON.parse(raw);}catch(err){return;}
+  open(gd);
+}
+
+document.addEventListener('click',function(e){
+  if(e.target.closest&&e.target.closest('.gc-join'))return;
+  var card=e.target.closest?e.target.closest('.gc[data-gd]'):null;
+  if(!card)return;
+  e.preventDefault();
+  openFromCard(card);
+});
+
+document.addEventListener('keydown',function(e){
+  if(e.key!=='Enter'&&e.key!==' ')return;
+  var card=e.target&&e.target.closest?e.target.closest('.gc[data-gd]'):null;
+  if(!card)return;
+  e.preventDefault();
+  openFromCard(card);
+});
+
+window.addEventListener('andrux_lang_change',function(){
+  var m=document.getElementById(MID);
+  if(m&&m.classList.contains('open')&&_gd&&_list)render(_gd,_list);
+});
+})();
 
 })();

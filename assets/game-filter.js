@@ -57,10 +57,13 @@ function ensureSettingsCard(){
   var left=document.createElement('div');
   var eyebrow=document.createElement('span');
   eyebrow.className='eyebrow';
+  eyebrow.setAttribute('data-i18n','set.game_filter');
   eyebrow.textContent=tt('set.game_filter');
   var h3=document.createElement('h3');
+  h3.setAttribute('data-i18n','set.hide_offline');
   h3.textContent=tt('set.hide_offline');
   var p=document.createElement('p');
+  p.setAttribute('data-i18n','set.hide_offline_desc');
   p.textContent=tt('set.hide_offline_desc');
   left.appendChild(eyebrow);
   left.appendChild(h3);
@@ -215,3 +218,20 @@ window.GameFilter={
   refresh:refreshAllFilters
 };
 })();
+
+/* Re-translate hide-offline card when language switches */
+function refreshHideOfflineI18n(){
+    var card=document.getElementById('hideOfflineCard');
+    if(!card)return;
+    var eb=card.querySelector('.eyebrow');
+    var h=card.querySelector('h3');
+    var p=card.querySelector('p');
+    if(eb)eb.textContent=tt('set.game_filter');
+    if(h)h.textContent=tt('set.hide_offline');
+    if(p)p.textContent=tt('set.hide_offline_desc');
+  }
+window.addEventListener('andrux_lang_change', refreshHideOfflineI18n);
+window.addEventListener('storage', function(e){
+  if(e.key==='andrux_lang'){ refreshHideOfflineI18n(); }
+});
+

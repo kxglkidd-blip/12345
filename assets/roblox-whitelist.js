@@ -4,9 +4,9 @@
 
 var SU='https://nyourvnfzhxbofwmavgq.supabase.co';
 var SK='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im55b3Vydm5memh4Ym9md21hdmdxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUwOTYwMTIsImV4cCI6MjEwMDY3MjAxMn0.YqztdjSz8kDAf9sHpqVeiMLjfwSbl4kvc8O5sGyJkvg';
-/* Roblox's own APIs send no Access-Control-Allow-Origin, so they only work in the desktop
-   build, where the request is routed through the main process. In a plain browser the lookup
-   has to go through a CORS-enabled mirror: roproxy's user service is down, so ff-roproxy and
+/* Roblox's own endpoints send no CORS headers, so they only work in the desktop build,
+   where the request is routed through the main process. In a plain browser the lookup has
+   to go through a CORS-enabled mirror: roproxy's user service is down, so ff-roproxy and
    rotunnel carry the username lookup, and roproxy still serves the thumbnails route. */
 var USER_ID_APIS=[
 'https://users.roblox.com/v1/usernames/users',
@@ -88,8 +88,8 @@ return r.json();
 });
 }
 
-/* Username -> id and id -> headshot both go through a small endpoint list; each call has a
-   hard timeout, retries once, and the result is cached (memory + localStorage). */
+/* Username -> id and id -> headshot both walk a small endpoint list; each call has a hard
+   timeout and one retry, and results are cached in memory + localStorage. */
 function withTimeout(promise,ms){
 return new Promise(function(res,rej){
 var timer=setTimeout(function(){rej(new Error('timeout'));},ms);
@@ -104,12 +104,6 @@ return new Promise(function(res){setTimeout(res,900);}).then(function(){return w
 });
 }
 
-/* Roblox's public APIs send no CORS headers, so a fetch() from a file:// renderer page is
-   blocked by the browser. In the desktop build we route these lookups through the main
-   process (which has no CORS); the plain fetch path stays as a fallback for web/Android.
-   roproxy is a caching proxy: its first hit on a cold key can take tens of seconds (or
-   briefly answer 520), but once warm it replies in well under a second, so the timeout is
-   deliberately generous and the caller retries. */
 function rbxJson(url,opts,ms){
 ms=ms||15000;
 var d=window.andruxDesktop;
@@ -131,14 +125,18 @@ function saveCache(key,obj){
 try{localStorage.setItem(key,JSON.stringify(obj));}catch(e){}
 }
 
-/* v3 keys: the older caches could hold a url from the retired headshot endpoint (renders as a
-   broken image forever), and the id-resolution strategy has changed, so start clean. */
-var _uidCache=loadCache('andrux_rbx_uid_cache_v3');
-var _avatarCache=loadCache('andrux_rbx_avatar_cache_v3');
+/* v4 keys: earlier caches could hold a url from the retired headshot endpoint (a permanent
+   broken image) or a username bound to the wrong id, so the old stores are abandoned. */
+var _uidCache=loadCache('andrux_rbx_uid_cache_v4');
+var _avatarCache=loadCache('andrux_rbx_avatar_cache_v4');
 
-/* Fallback used when the official lookup is unreachable (i.e. the website build, where the
-   renderer has no main-process proxy). Search returns fuzzy matches, so require an exact
-   name match to avoid binding the wrong account. */
+/* Only the desktop build can reach Roblox directly (through the main process); a plain
+   browser renderer has no CORS exemption and must use the CORS-enabled search endpoint. */
+function hasDesktopProxy(){
+return !!(window.andruxDesktop&&typeof window.andruxDesktop.robloxJson==='function');
+}
+
+/* Search returns fuzzy matches, so require an exact name match to avoid binding a stranger. */
 function searchRobloxUserId(username){
 var key=String(username).toLowerCase();
 function attempt(i){
@@ -156,12 +154,6 @@ throw e;
 });
 }
 return attempt(0);
-}
-
-/* Only the desktop build can reach Roblox directly (through the main process); a plain
-   browser renderer has no CORS exemption, so it must use the CORS-enabled search endpoint. */
-function hasDesktopProxy(){
-return !!(window.andruxDesktop&&typeof window.andruxDesktop.robloxJson==='function');
 }
 
 function resolveRobloxUserId(username){
@@ -185,19 +177,17 @@ throw new Error('not found');
 }
 return postAt(hasDesktopProxy()?0:1).catch(function(){return searchRobloxUserId(username);}).then(function(id){
 if(!id)throw new Error('not found');
-_uidCache[key]=id;saveCache('andrux_rbx_uid_cache_v3',_uidCache);
+_uidCache[key]=id;saveCache('andrux_rbx_uid_cache_v4',_uidCache);
 return id;
 }).catch(function(){return null;});
 }
 
-/* Roblox's legacy www.roblox.com/headshot-thumbnail endpoint no longer serves images;
-   the thumbnails API returns the real CDN url (tr.rbxcdn.com) instead. */
+/* The legacy www.roblox.com/headshot-thumbnail endpoint no longer serves images; the
+   thumbnails API answers with the real CDN url (tr.rbxcdn.com) instead. */
 function fetchAvatarUrl(userId){
 if(!userId)return Promise.resolve(null);
 var key=String(userId);
 if(_avatarCache[key])return Promise.resolve(_avatarCache[key]);
-/* Try whichever host is actually reachable first: Roblox directly only works with the
-   main-process proxy, roproxy is the one that carries CORS headers. */
 var apis=hasDesktopProxy()?THUMB_DIRECT.concat(THUMB_CORS):THUMB_CORS.concat(THUMB_DIRECT);
 function attempt(i){
 return rbxJson(apis[i]+'?userIds='+encodeURIComponent(key)+'&size=150x150&format=Png&isCircular=true',{
@@ -212,18 +202,52 @@ throw e;
 });
 }
 return withRetry(function(){return attempt(0);},2).then(function(url){
-_avatarCache[key]=url;saveCache('andrux_rbx_avatar_cache_v3',_avatarCache);
+_avatarCache[key]=url;saveCache('andrux_rbx_avatar_cache_v4',_avatarCache);
 return url;
 }).catch(function(){return null;});
 }
 
+/* The initial renders right away and stays as the visible layer until the real headshot
+   loads, so the row never collapses to an empty slot while the request is in flight. */
 function avatarHtml(name,userId){
 var initial=(name||'?').charAt(0).toUpperCase();
-/* The initial shows immediately; the real headshot fades in over it once it loads. */
-return'<span class="wl-avatar-slot">'+
-'<span class="wl-avatar-fallback">'+initial+'</span>'+
-'<img class="wl-avatar" alt="'+name+'" data-roblox-name="'+name+'" data-user-id="'+(userId||'')+'" style="display:none"/>'+
-'</span>';
+return'<div class="wl-avatar-fallback">'+initial+'</div>'+
+'<img class="wl-avatar" alt="'+name+'" data-roblox-name="'+name+'" data-user-id="'+(userId||'')+'" style="display:none"/>';
+}
+
+function dropAvatarImg(img){
+if(img.parentNode)img.parentNode.removeChild(img);
+}
+function avatarTries(img){return Number(img.getAttribute('data-tries')||'0');}
+function retryAvatar(img){
+var tries=avatarTries(img);
+/* A transient thumbnail failure must not leave the row stuck on its initial forever:
+   retry with backoff, then keep the initial as the fallback. */
+if(tries>=3){dropAvatarImg(img);return;}
+img.setAttribute('data-tries',String(tries+1));
+setTimeout(function(){loadAvatar(img);},700*(tries+1));
+}
+function forgetAvatar(uid){
+if(uid&&_avatarCache[uid]){delete _avatarCache[uid];saveCache('andrux_rbx_avatar_cache_v4',_avatarCache);}
+}
+
+/* One attempt: prefer the id stored in the DB, but fall back to resolving it from the
+   username so the avatar still shows when the stored id is missing. */
+function loadAvatar(img){
+if(!img.parentNode)return;
+var tries=avatarTries(img);
+var uid=img.getAttribute('data-user-id')||'';
+var name=img.getAttribute('data-roblox-name')||'';
+var getId=uid?Promise.resolve(uid):resolveRobloxUserId(name);
+getId.then(function(id){
+if(!id)throw new Error('no id');
+/* On a retry the cached thumbnail may be the dead one that just failed, so force a re-fetch. */
+if(tries>0)forgetAvatar(String(id));
+return fetchAvatarUrl(id);
+}).then(function(url){
+if(!url)throw new Error('no url');
+if(img.parentNode)img.src=url;
+}).catch(retryAvatar.bind(null,img));
 }
 
 function setupAvatarImages(){
@@ -236,32 +260,9 @@ img.style.display='';
 var fb=img.parentNode?img.parentNode.querySelector('.wl-avatar-fallback'):null;
 if(fb)fb.style.display='none';
 });
-/* A cached but dead CDN url must not block the avatar forever: drop it and re-resolve once. */
-img.addEventListener('error',function(){
-if(img._wlRetried)return;
-img._wlRetried=true;
-var dead=img.getAttribute('data-user-id')||'';
-if(dead&&_avatarCache[dead]){delete _avatarCache[dead];saveCache('andrux_rbx_avatar_cache_v3',_avatarCache);}
-var name2=img.getAttribute('data-roblox-name')||'';
-var again=dead?Promise.resolve(dead):resolveRobloxUserId(name2);
-again.then(function(id){
-if(!id)return;
-return fetchAvatarUrl(id).then(function(url){
-if(url&&img.parentNode)img.src=url;
-});
-});
-});
-/* Prefer the id stored in the DB, but fall back to resolving it from the username so
-   the avatar still shows when the stored id is missing. */
-var uid=img.getAttribute('data-user-id');
-var name=img.getAttribute('data-roblox-name')||'';
-var getId=uid?Promise.resolve(uid):resolveRobloxUserId(name);
-getId.then(function(id){
-if(!id)return;
-return fetchAvatarUrl(id).then(function(url){
-if(url&&img.parentNode)img.src=url;
-});
-});
+/* The url that just failed is dead, so drop it before the next attempt re-fetches. */
+img.addEventListener('error',function(){forgetAvatar(img.getAttribute('data-user-id')||'');retryAvatar(img);});
+loadAvatar(img);
 });
 }
 

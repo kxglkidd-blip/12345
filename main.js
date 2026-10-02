@@ -20,16 +20,21 @@ function openExternalSafe(url) {
 
 ipcMain.handle('open-external', (_event, url) => openExternalSafe(url));
 
-/* Roblox's public APIs send no CORS headers, so a fetch() from the renderer (file:// origin)
-   is blocked. Proxy these JSON lookups through the main process, which has no CORS. */
+/* Roblox's public APIs send no Access-Control-Allow-Origin, so a fetch() from the renderer
+   (file:// origin) is blocked by the browser. Route these JSON lookups through the main
+   process, which has no CORS restriction. Only the hosts below are reachable. */
 const ALLOWED_JSON_HOSTS = new Set([
   'users.roblox.com',
+  'groups.roblox.com',
   'thumbnails.roblox.com',
   'users.roproxy.com',
+  'groups.roproxy.com',
   'thumbnails.roproxy.com',
   'users.ff-roproxy.com',
+  'groups.ff-roproxy.com',
   'thumbnails.ff-roproxy.com',
   'users.rotunnel.com',
+  'groups.rotunnel.com',
   'thumbnails.rotunnel.com'
 ]);
 
