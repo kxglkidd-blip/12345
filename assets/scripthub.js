@@ -130,7 +130,7 @@ function deleteCard(card){
     return Promise.reject(new Error('no permission'));
   }
   if(dbReady&&String(card.id).indexOf('preset-')!==0&&String(card.id).indexOf('local-')!==0){
-    return fetch(SU+'/rest/v1/'+TABLE+'?id=eq.'+card.id,{method:'DELETE',headers:HDRS});
+    return fetch(SU+'/rest/v1/'+TABLE+'?id=eq.'+encodeURIComponent(card.id),{method:'DELETE',headers:HDRS});
   }
   var a=lsGet().filter(function(c){return c.id!==card.id;});
   lsSet(a);return Promise.resolve();
@@ -146,6 +146,7 @@ function loadServers(){
       sel.innerHTML='';
       if(!rows||!rows.length){
         sel.innerHTML='<option value="">'+tt('sh.no_games')+'</option>';
+        currentPlaceId=null;
         return;
       }
       var now=Date.now();
@@ -180,11 +181,25 @@ function loadServers(){
         sel.value=online[0].pid;
         currentPlaceId=online[0].pid;
       }else{
-        currentPlaceId=sel.value||null;
+        /* 只有离线：不可选，清空目标 */
+        currentPlaceId=null;
+        if(offline.length){
+          var ph=document.createElement('option');
+          ph.value='';
+          ph.textContent=tt('sh.no_online');
+          sel.insertBefore(ph, sel.firstChild);
+          sel.value='';
+        }
       }
-      sel.onchange=function(){currentPlaceId=sel.value;};
+      sel.onchange=function(){
+        var v=sel.value;
+        currentPlaceId=v||null;
+      };
     })
-    .catch(function(){sel.innerHTML='<option value="">'+tt('sh.load_fail')+'</option>';});
+    .catch(function(){
+      currentPlaceId=null;
+      sel.innerHTML='<option value="">'+tt('sh.load_fail')+'</option>';
+    });
 }
 
 /* ===== 白名单：Require 只对白名单 Roblox 玩家执行 ===== */
@@ -234,13 +249,14 @@ function logExec(placeId,source){
   }).catch(function(){});
 }
 
-function pushToQueue(payloads){
+function pushToQueue(payloads, opts){
+  opts = opts || {};
   if(!currentPlaceId){
-    toast(tt('sh.need_server'));return Promise.reject();
+    toast(tt('sh.need_server'));return Promise.reject(new Error('no server'));
   }
   if(!Array.isArray(payloads)) payloads=[payloads];
   if(!payloads.length) return Promise.reject(new Error('empty'));
-  var placeUrl=SU+'/rest/v1/ax_gs?place_id=eq.'+currentPlaceId;
+  var placeUrl=SU+'/rest/v1/ax_gs?place_id=eq.'+encodeURIComponent(currentPlaceId);
   return fetch(placeUrl+'?select=exec_queue',{headers:HDRS})
     .then(function(r){return r.json();})
     .then(function(rows){
@@ -256,7 +272,7 @@ function pushToQueue(payloads){
     .then(function(r){
       if(!r.ok)return r.text().then(function(t){throw new Error('HTTP '+r.status+': '+t);});
       logExec(currentPlaceId,'scripthub');
-      toast(tt('sh.exec_ok'));
+      if(!opts.silent) toast(tt('sh.exec_ok'));
     });
 }
 
@@ -292,7 +308,7 @@ function executeCard(c){
         for_whitelist:true,
         whitelist_only:true
       };
-      return pushToQueue(payload).then(function(){
+      return pushToQueue(payload,{silent:true}).then(function(){
         toast(tt('sh.require_pushed'));
       });
     }).catch(function(){toast(tt('sh.push_fail_conn'));});
@@ -311,8 +327,18 @@ function showCardDetail(c,bgStyle){
   var t=$('detailTitle');if(t)t.textContent=c.title||tt('sh.detail_title');
   var cover=$('detailCover');
   if(cover){
-    if(c.bg)cover.style.backgroundImage="url('"+c.bg+"')";
-    else cover.style.background=bgStyle||'linear-gradient(135deg,#1f2430 0%,#11141c 100%)';
+    cover.style.backgroundImage='none';
+    if(c.bg){
+      cover.style.backgroundImage="url(\""+String(c.bg).replace(/"/g,'')+"\")";
+      cover.style.backgroundSize='cover';
+      cover.style.backgroundPosition='center';
+    }else if(bgStyle&&bgStyle.indexOf('linear')>=0){
+      cover.style.background=bgStyle.replace(/^background:\s*/,'')||bgStyle;
+    }else if(bgStyle&&bgStyle.indexOf('background:')===0){
+      cover.style.cssText=bgStyle+';border-radius:16px;';
+    }else{
+      cover.style.background='linear-gradient(135deg,#203a33 0%,#11141c 55%,#6f4d2d 100%)';
+    }
   }
   var badge=$('detailBadge');
   if(badge){
@@ -346,6 +372,7 @@ var BG_GRADIENTS=[
 
 function render(){
   var grid=$('shGrid');if(!grid)return;
+  grid.classList.add('ax-stagger');
   var kw=($('shSearchInput')&&$('shSearchInput').value||'').toLowerCase();
   grid.innerHTML='';
   var me=getCurrentUser();
@@ -372,7 +399,7 @@ function render(){
         '<div class="sh-card-info">'+
           '<h4>'+escapeHtml(c.title)+'</h4>'+
           '<p>'+escapeHtml(c.desc||tt('sh.no_intro'))+'</p>'+
-          '<div style="font-size:11px;color:var(--muted);margin-bottom:8px">'+tt('sh.author_prefix')+escapeHtml(c.author||tt('sh.community'))+'</div>'+
+          '<div class="sh-card-meta">'+tt('sh.author_prefix')+escapeHtml(c.author||tt('sh.community'))+'</div>'+
         '</div>'+
         '<div class="sh-card-actions">'+
           '<button class="sh-exec-btn">'+tt('sh.exec')+'</button>'+
@@ -396,7 +423,7 @@ function render(){
       delBtn.onclick=function(e){
         e.stopPropagation();
         if(!confirm(tt('sh.confirm_delete')+c.title+tt('sh.confirm_delete_end')))return;
-        deleteCard(c).then(loadCards).catch(function(){});
+        deleteCard(c).then(function(){toast(tt('sh.card_deleted'));loadCards();}).catch(function(err){if(err&&err.message!=='no permission')toast(tt('sh.push_fail_conn'));});
       };
     }
 

@@ -230,14 +230,17 @@
 
       if (fromUser) {
         var len = val.length;
-        if (len > lastLen) {
-          playAnim(wrap, 'insert');
-          spawnRipple(wrap, textarea, 'insert');
-        } else if (len < lastLen) {
-          playAnim(wrap, 'delete');
-          spawnRipple(wrap, textarea, 'delete');
-        }
+        var delta = len - lastLen;
         lastLen = len;
+        if (delta !== 0) {
+          var now = Date.now();
+          if (!wrap._lastAnimAt || now - wrap._lastAnimAt > 100) {
+            wrap._lastAnimAt = now;
+            var kind = delta > 0 ? 'insert' : 'delete';
+            playAnim(wrap, kind);
+            spawnRipple(wrap, textarea, kind);
+          }
+        }
       } else {
         lastLen = val.length;
       }

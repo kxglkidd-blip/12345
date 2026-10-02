@@ -180,3 +180,225 @@ body.reduce-motion .gd-mask,body.reduce-motion .gd-card,body.reduce-motion .gd-c
   .luau-hl-wrap{min-height:220px;}
   .luau-hl-pre,.luau-hl-textarea{min-height:220px;}
 }
+
+/* ===== Andrux UI polish & motion ===== */
+:root{
+  --motion: cubic-bezier(.22,1,.36,1);
+  --motion-spring: cubic-bezier(.34,1.4,.64,1);
+  --glow-accent: 0 10px 28px rgba(111,77,45,0.18);
+  --glow-ok: 0 8px 22px rgba(45,111,82,0.2);
+}
+
+/* Page enter */
+@keyframes axFadeUp{
+  from{opacity:0;transform:translateY(14px);}
+  to{opacity:1;transform:translateY(0);}
+}
+@keyframes axFadeIn{
+  from{opacity:0;}
+  to{opacity:1;}
+}
+@keyframes axScaleIn{
+  from{opacity:0;transform:scale(.96);}
+  to{opacity:1;transform:scale(1);}
+}
+@keyframes axSlideRight{
+  from{opacity:0;transform:translateX(-10px);}
+  to{opacity:1;transform:translateX(0);}
+}
+@keyframes axToastIn{
+  from{opacity:0;transform:translate(-50%,12px) scale(.96);}
+  to{opacity:1;transform:translate(-50%,0) scale(1);}
+}
+@keyframes axToastOut{
+  from{opacity:1;transform:translate(-50%,0) scale(1);}
+  to{opacity:0;transform:translate(-50%,8px) scale(.96);}
+}
+@keyframes axPulseSoft{
+  0%,100%{box-shadow:0 0 0 0 rgba(32,58,51,0);}
+  50%{box-shadow:0 0 0 6px rgba(32,58,51,0.12);}
+}
+@keyframes axShimmer{
+  0%{background-position:200% 0;}
+  100%{background-position:-200% 0;}
+}
+@keyframes axCardIn{
+  from{opacity:0;transform:translateY(18px) scale(.98);}
+  to{opacity:1;transform:translateY(0) scale(1);}
+}
+@keyframes axBtnRipple{
+  to{transform:scale(2.4);opacity:0;}
+}
+
+/* Global interactive polish */
+button,.nav-btn,.primary-btn,.ghost-btn,.mini-btn,.danger-btn,.sh-add-btn,.sh-exec-btn{
+  transition:transform var(--speed) var(--motion),box-shadow var(--speed) var(--motion),background var(--speed) var(--motion),border-color var(--speed) var(--motion),filter var(--speed) var(--motion),opacity var(--speed) var(--motion),color var(--speed) var(--motion)!important;
+}
+button:active:not(:disabled),.nav-btn:active,.primary-btn:active,.mini-btn:active{
+  transform:translateY(1px) scale(.98)!important;
+}
+.primary-btn{
+  position:relative;overflow:hidden;
+  box-shadow:0 6px 18px rgba(32,58,51,0.18);
+}
+.primary-btn:hover{
+  filter:brightness(1.06);
+  transform:translateY(-1px);
+  box-shadow:var(--glow-ok);
+}
+.ghost-btn:hover{
+  background:rgba(23,19,13,0.05);
+  transform:translateY(-1px);
+}
+.danger-btn:hover,.mini-btn.danger:hover{
+  filter:brightness(1.05);
+  transform:translateY(-1px);
+}
+
+/* Sidebar */
+.sidebar{
+  transition:transform var(--speed) var(--motion),box-shadow var(--speed) var(--motion);
+}
+.nav-btn{
+  position:relative;
+  overflow:hidden;
+}
+.nav-btn::before{
+  content:'';
+  position:absolute;left:0;top:50%;transform:translateY(-50%) scaleY(0);
+  width:3px;height:60%;border-radius:0 4px 4px 0;
+  background:var(--accent2);
+  transition:transform .28s var(--motion-spring);
+}
+.nav-btn:hover{
+  background:rgba(32,58,51,0.06);
+  transform:translateX(2px);
+}
+.nav-btn.active{
+  background:rgba(32,58,51,0.1);
+  font-weight:700;
+}
+.nav-btn.active::before{
+  transform:translateY(-50%) scaleY(1);
+}
+.nav-btn .nav-code{
+  transition:opacity .2s,color .2s;
+}
+.nav-btn:hover .nav-code{opacity:1;color:var(--accent2);}
+
+/* Page content */
+.page.active{
+  animation:axFadeUp .42s var(--motion) both;
+}
+.page-header{
+  animation:axSlideRight .4s var(--motion) both;
+}
+.card,.setting-card,.exec-editor-card,.exec-game-card{
+  transition:transform var(--speed) var(--motion),box-shadow var(--speed) var(--motion),border-color var(--speed) var(--motion);
+}
+.card:hover,.setting-card:hover{
+  box-shadow:0 12px 32px rgba(33,26,16,0.08);
+}
+
+/* Toast */
+.toast{
+  transition:none;
+}
+.toast.show{
+  animation:axToastIn .32s var(--motion-spring) both;
+}
+
+/* Exec game list items */
+.exec-game-item{
+  transition:transform .22s var(--motion),border-color .22s,background .22s,box-shadow .22s,opacity .22s!important;
+}
+.exec-game-item:hover:not(.offline){
+  transform:translateY(-2px);
+  box-shadow:0 8px 20px rgba(33,26,16,0.08);
+}
+.exec-game-item.selected{
+  box-shadow:0 0 0 2px rgba(32,58,51,0.2),0 8px 22px rgba(32,58,51,0.1);
+  animation:axPulseSoft 1.6s ease-in-out 1;
+}
+
+/* Admin list items */
+.admin-item{
+  transition:transform .2s var(--motion),box-shadow .2s,border-color .2s,background .2s;
+  animation:axCardIn .35s var(--motion) both;
+}
+.admin-item:hover{
+  transform:translateY(-1px);
+  box-shadow:0 6px 16px rgba(33,26,16,0.07);
+}
+
+/* Stagger utility for dynamically filled lists */
+.ax-stagger > *:nth-child(1){animation-delay:.02s}
+.ax-stagger > *:nth-child(2){animation-delay:.05s}
+.ax-stagger > *:nth-child(3){animation-delay:.08s}
+.ax-stagger > *:nth-child(4){animation-delay:.11s}
+.ax-stagger > *:nth-child(5){animation-delay:.14s}
+.ax-stagger > *:nth-child(6){animation-delay:.17s}
+.ax-stagger > *:nth-child(7){animation-delay:.2s}
+.ax-stagger > *:nth-child(8){animation-delay:.23s}
+.ax-stagger > *:nth-child(9){animation-delay:.26s}
+.ax-stagger > *:nth-child(10){animation-delay:.29s}
+.ax-stagger > *:nth-child(n+11){animation-delay:.32s}
+
+/* Switch toggles */
+.switch span{
+  transition:background .25s var(--motion),transform .25s var(--motion-spring)!important;
+}
+.switch input:checked + span{
+  transition:background .25s var(--motion),transform .25s var(--motion-spring);
+}
+
+/* Lang buttons */
+.lang-btn{
+  transition:transform .2s var(--motion),background .2s,color .2s,box-shadow .2s!important;
+}
+.lang-btn:hover{transform:translateY(-1px);}
+.lang-btn.active{
+  box-shadow:0 4px 14px rgba(32,58,51,0.18);
+}
+
+/* Reduce motion preference */
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{
+    animation-duration:.01ms!important;
+    animation-iteration-count:1!important;
+    transition-duration:.01ms!important;
+  }
+}
+body.reduce-motion *,body.reduce-motion *::before,body.reduce-motion *::after{
+  animation-duration:.01ms!important;
+  transition-duration:.01ms!important;
+}
+
+.ax-click-ripple{
+  position:absolute;border-radius:50%;
+  background:rgba(255,250,241,0.35);
+  transform:scale(0);pointer-events:none;
+  animation:axBtnRipple .45s ease-out forwards;
+}
+
+/* Community single channel */
+.comm-single-channel{grid-template-columns:1fr!important;}
+.comm-single-channel .channels{display:none!important;}
+.comm-single-channel .chat-panel{min-height:min(70vh,640px);}
+.comm-single-channel .chat-log{min-height:420px;}
+
+.chat-input,textarea#messageInput,.composer textarea{
+  user-select:text!important;-webkit-user-select:text!important;
+  pointer-events:auto!important;
+  color:var(--ink)!important;
+  background:#fff!important;
+  min-height:52px;
+  width:100%;
+  padding:12px 14px;
+  border:1px solid var(--rule);
+  border-radius:16px;
+  resize:vertical;
+}
+.chat-input:focus,textarea#messageInput:focus{
+  outline:none;border-color:var(--accent2);box-shadow:0 0 0 3px rgba(32,58,51,.12);
+}
