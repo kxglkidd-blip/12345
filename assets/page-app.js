@@ -423,7 +423,12 @@ if(res.status===204)return null;
 /* HEAD 请求没有响应体，直接返回 response 对象，让调用方读取 headers */
 var method=(options&&options.method)||'GET';
 if(method.toUpperCase()==='HEAD')return res;
-return res.json();
+/* Prefer: return=minimal 时 POST 返回 201 且响应体为空，直接 .json() 会抛
+   "Unexpected end of JSON input"，因此先取文本、仅在非空时解析 */
+return res.text().then(function(txt){
+if(!txt)return null;
+try{return JSON.parse(txt);}catch(e){return null;}
+});
 });
 }
 
