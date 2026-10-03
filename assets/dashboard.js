@@ -95,8 +95,8 @@ var execCount=0;
 var _loading=false;
 
 /* ===== Load games from Supabase (BUG FIX: was reading localStorage only) ===== */
-/* Filter: status=online AND hidden=false AND heartbeat within 5 min (truly online) */
-var STALE_MS=5*60*1000; /* 5 minutes without heartbeat = offline */
+/* Filter: status=online AND hidden=false AND heartbeat within 60s (must match the game page) */
+var STALE_MS=60000; /* 60s without heartbeat = offline (heartbeat interval ~30s) */
 function isGameAlive(g){
   if(!g||g.status!=='online')return false;
   if(!g.last_heartbeat)return false;

@@ -614,6 +614,7 @@ if(mu)mu.textContent='-';if(mm)mm.textContent='-';
 function normMsg(row){
 if(!row||typeof row!=='object')return row;
 return {
+id:row.id||row.c0,
 c0:row.c0||row.id,
 c1:row.c1||row.user_id,
 c2:row.c2||row.username,
@@ -722,7 +723,7 @@ var time=msg.c11?new Date(msg.c11).toLocaleTimeString(window.I18N&&window.I18N.l
 var recalled=!!msg.c10;
 var locallyDeleted=mine&&deletedIds.indexOf(msg.c0)>=0;
 var qhtml=msg.c5&&!recalled&&!locallyDeleted?'<div class="quote selectable"><b style="display:block;font-size:11px;color:var(--accent);margin-bottom:4px;letter-spacing:.04em">REPLY</b>'+escapeHTML(String(msg.c5).slice(0,220))+'</div>':'';
-var body=recalled?t('comm.msg_recalled'):locallyDeleted?'':escapeHTML(msg.c4);
+var body=recalled?t('comm.msg_recalled'):locallyDeleted?(t('comm.msg_deleted')||'此消息已被删除'):escapeHTML(msg.c4);
 var fileHtml='';
 if(msg.c6&&!recalled&&!locallyDeleted){
 var fname=escapeHTML(msg.c6);
@@ -962,20 +963,51 @@ if(String(msg.c1)!==String(session.id)){toast(t('toast.recall_fail'));return;}
 if(msg.c10)return;
 var age=msg.c11?Date.now()-new Date(msg.c11).getTime():0;
 if(age>60000){toast(t('toast.recall_fail'));return;}
-var id=encodeURIComponent(msg.c0);
-function patch(q, body){
-return api(T_MSGS,q,{method:'PATCH',body:JSON.stringify(body),skipRate:true,headers:{Prefer:'return=minimal'}});
+
+var realId=encodeURIComponent(msg.id||msg.c0);
+var c0Id=encodeURIComponent(msg.c0||msg.id);
+var recallPayload={
+  recalled:true,
+  c10:true,
+  content:'',
+  c4:'',
+  quote_content:null,
+  c5:null,
+  file_name:null,
+  c6:null,
+  file_type:null,
+  c7:null,
+  file_size:null,
+  c8:null,
+  file_data:null,
+  c9:null
+};
+
+function doPatch(q){
+  return api(T_MSGS,q,{method:'PATCH',body:JSON.stringify(recallPayload),skipRate:true,headers:{Prefer:'return=minimal'}});
 }
-patch('?id=eq.'+id,{recalled:true,c10:true})
-.catch(function(){return patch('?c0=eq.'+id,{recalled:true,c10:true});})
+
+doPatch('?id=eq.'+realId)
+.then(function(res){
+  if(Array.isArray(res)&&res.length===0){
+    return doPatch('?c0=eq.'+c0Id);
+  }
+  return res;
+})
+.catch(function(){
+  return doPatch('?c0=eq.'+c0Id);
+})
 .then(function(){
-toast(t('toast.recalled'));
-msg.c10=true;
-try{renderMessages();}catch(e){}
-loadMessages();
+  toast(t('toast.recalled'));
+  msg.c10=true;
+  msg.recalled=true;
+  msg.c4='';
+  msg.content='';
+  try{renderMessages();}catch(e){}
+  loadMessages();
 }).catch(function(err){
-console.warn('recall failed',err);
-toast(t('toast.recall_fail'));
+  console.warn('recall failed',err);
+  toast(t('toast.recall_fail'));
 });
 }
 

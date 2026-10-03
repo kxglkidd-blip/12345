@@ -327,7 +327,7 @@ var count=$('wlBindCount');
 var toggle=$('wlAddToggle');
 
 if(count)count.textContent=bindings.length+'/5';
-if(toggle)toggle.style.display=bindings.length>=5?'none':'';
+if(toggle)toggle.style.display=(bindings.length>=5 || _isAdding)?'none':'';
 
 if(!area)return;
 
@@ -362,7 +362,9 @@ doUnbind(btn.getAttribute('data-unbind'));
 setupAvatarImages();
 }
 
+var _isAdding = false;
 function showAddForm(){
+  _isAdding = true;
 var tg=$('wlAddToggle'),f=$('wlAddForm');
 if(tg)tg.style.display='none';
 if(f)f.style.display='';
@@ -371,8 +373,9 @@ if(i)i.focus();
 }
 
 function hideAddForm(){
+  _isAdding = false;
 var tg=$('wlAddToggle'),f=$('wlAddForm');
-if(tg)tg.style.display='';
+  if(tg)tg.style.display=bindings.length>=5?'none':'';
 if(f)f.style.display='none';
 var i=$('wlBindInput');
 if(i)i.value='';

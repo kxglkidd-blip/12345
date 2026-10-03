@@ -204,7 +204,7 @@ function loadServers(){
         if(row.last_heartbeat){
           try{
             var hb=new Date(row.last_heartbeat).getTime();
-            if(isFinite(hb)&&(now-hb)>120000) isOnline=false;
+            if(isFinite(hb)&&(now-hb)>60000) isOnline=false;
           }catch(e){}
         }
         var item={pid:pid,name:row.game_name||(tt('sh.game_prefix')+pid),pc:row.player_count||0,online:isOnline};

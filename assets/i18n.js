@@ -325,6 +325,7 @@ window.I18N = {
       'comm.copy': '复制',
       'comm.delete': '删除',
       'comm.msg_recalled': '消息已撤回',
+      'comm.msg_deleted': '此消息已被删除',
       'comm.loading': '加载中...',
 
       /* ===== Game ===== */
@@ -915,6 +916,7 @@ window.I18N = {
       'comm.copy': 'Copy',
       'comm.delete': 'Delete',
       'comm.msg_recalled': 'Message recalled',
+      'comm.msg_deleted': 'This message was deleted',
       'comm.loading': 'Loading...',
 
       /* ===== Game ===== */
@@ -1327,6 +1329,7 @@ window.I18N = {
   apply: function() {
     document.documentElement.lang = this.lang === 'zh' ? 'zh-CN' : 'en';
     document.querySelectorAll('[data-i18n]').forEach(function(el) {
+      if (el.id === 'toast' || (el.classList && el.classList.contains('toast'))) return;
       var key = el.getAttribute('data-i18n');
       var text = window.I18N.t(key);
       el.textContent = text;
