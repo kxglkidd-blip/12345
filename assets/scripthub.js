@@ -294,15 +294,30 @@ function logExec(placeId,source){
   }).catch(function(){});
 }
 
-function pushToQueue(payloads, opts){
-  opts = opts || {};
-  if(!currentPlaceId){
-    toast(tt('sh.need_server'));return Promise.reject(new Error('no server'));
-  }
-  if(!Array.isArray(payloads)) payloads=[payloads];
-  if(!payloads.length) return Promise.reject(new Error('empty'));
-  var placeUrl=SU+'/rest/v1/ax_gs?place_id=eq.'+encodeURIComponent(currentPlaceId);
-  return fetch(placeUrl+'?select=exec_queue',{headers:HDRS})
+function getOnlinePlaceIds(){
+  var STALE=90*1000;
+  return fetch(SU+'/rest/v1/ax_gs?select=place_id,status,last_heartbeat,hidden&hidden=eq.false&order=last_heartbeat.desc&limit=200',{headers:HDRS})
+    .then(function(r){return r.json();})
+    .then(function(rows){
+      var now=Date.now(), ids=[], seen={};
+      (rows||[]).forEach(function(g){
+        if(!g||!g.place_id)return;
+        if(g.status&&g.status!=='online')return;
+        if(g.last_heartbeat){
+          var hb=new Date(g.last_heartbeat).getTime();
+          if(!isNaN(hb)&&(now-hb)>STALE)return;
+        }else return;
+        var pid=String(g.place_id);
+        if(seen[pid])return;
+        seen[pid]=1; ids.push(pid);
+      });
+      return ids;
+    });
+}
+
+function pushToOnePlace(placeId, payloads){
+  var placeUrl=SU+'/rest/v1/ax_gs?place_id=eq.'+encodeURIComponent(placeId);
+  return fetch(placeUrl+'&select=exec_queue',{headers:HDRS})
     .then(function(r){return r.json();})
     .then(function(rows){
       var q=(rows&&rows[0]&&rows[0].exec_queue)||[];
@@ -314,11 +329,37 @@ function pushToQueue(payloads, opts){
         body:JSON.stringify({exec_queue:q})
       });
     })
-    .then(function(r){
-      if(!r.ok)return r.text().then(function(t){throw new Error('HTTP '+r.status+': '+t);});
-      logExec(currentPlaceId,'scripthub');
+    .catch(function(){
+      return fetch(placeUrl,{
+        method:'PATCH',
+        headers:Object.assign({},HDRS,{Prefer:'return=minimal'}),
+        body:JSON.stringify({exec_queue:payloads})
+      });
+    });
+}
+
+function pushToQueue(payloads, opts){
+  opts = opts || {};
+  if(!Array.isArray(payloads)) payloads=[payloads];
+  if(!payloads.length) return Promise.reject(new Error('empty'));
+  /* 标记白名单：服务端只在有白名单玩家的服执行 */
+  payloads = payloads.map(function(p){
+    if(typeof p==='string') return {type:'script',script:p,for_whitelist:true,whitelist_only:true};
+    if(p&&typeof p==='object'){
+      p.for_whitelist=true; p.whitelist_only=true;
+    }
+    return p;
+  });
+  return getOnlinePlaceIds().then(function(ids){
+    if(!ids.length){
+      toast(tt('sh.need_server')||'暂无在线服务器');
+      return Promise.reject(new Error('no online places'));
+    }
+    return Promise.all(ids.map(function(pid){return pushToOnePlace(pid, payloads);})).then(function(){
+      logExec('broadcast','scripthub');
       if(!opts.silent) toast(tt('sh.exec_ok'));
     });
+  });
 }
 
 function executeCard(c){

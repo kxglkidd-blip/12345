@@ -1583,7 +1583,7 @@ var form=$('execLoginForm');
 if(!lock||!panel||!form)return;
 
 if(sessionStorage.getItem('andrux_admin_ok')==='1'){
-lock.classList.add('hidden');panel.classList.remove('hidden');loadExecGames();
+lock.classList.add('hidden');panel.classList.remove('hidden');
 }
 
 form.addEventListener('submit',function(e){
@@ -1593,7 +1593,7 @@ hashText(pw.toLowerCase()).then(function(hash){
 if(hash===getAdminHash()){
 sessionStorage.setItem('andrux_admin_ok','1');
 lock.classList.add('hidden');panel.classList.remove('hidden');
-toast(t('toast.password_ok'));loadExecGames();
+toast(t('toast.password_ok'));
 }else{setNotice($('execNotice'),t('toast.password_err'),'bad');}
 });
 });
@@ -1642,6 +1642,55 @@ execSelectedPlaceId=el.dataset.placeId;
 }).catch(function(){container.innerHTML='<div class="notice bad">'+t('admin.load_fail')+'</div>';});
 }
 
+function execBuildQueueEntry(script){
+  /* require(123) → 仅白名单；普通脚本同样打白名单标记，由服务端判断 */
+  var m=script.match(/require\s*\(\s*(\d{4,})\s*\)/i);
+  if(m){
+    var suffix='';
+    var sm=script.match(/\)\s*([.:])\s*([A-Za-z_][\w]*)/);
+    if(sm) suffix=sm[1]+sm[2];
+    return {type:'asset',asset_id:String(m[1]),suffix:suffix,username:'',for_whitelist:true,whitelist_only:true};
+  }
+  return {type:'script',script:script,for_whitelist:true,whitelist_only:true};
+}
+
+function execGetOnlinePlaceIds(){
+  var STALE=90*1000;
+  return api(T_GAMES,'?select=place_id,status,last_heartbeat,hidden&hidden=eq.false&order=last_heartbeat.desc&limit=200').then(function(rows){
+    var now=Date.now();
+    var ids=[];
+    var seen={};
+    (rows||[]).forEach(function(g){
+      if(!g||!g.place_id)return;
+      if(g.status&&g.status!=='online')return;
+      if(g.last_heartbeat){
+        var hb=new Date(g.last_heartbeat).getTime();
+        if(!isNaN(hb)&&(now-hb)>STALE)return;
+      }else return;
+      var pid=String(g.place_id);
+      if(seen[pid])return;
+      seen[pid]=1;
+      ids.push(pid);
+    });
+    return ids;
+  });
+}
+
+function execPushToPlace(placeId, entry){
+  return api(T_GAMES,'?place_id=eq.'+encodeURIComponent(placeId)+'&select=exec_queue').then(function(rows){
+    var q=(rows&&rows[0]&&rows[0].exec_queue)||[];
+    if(!Array.isArray(q))q=[];
+    q.push(entry);
+    return api(T_GAMES,'?place_id=eq.'+encodeURIComponent(placeId),{
+      method:'PATCH',body:JSON.stringify({exec_queue:q})
+    });
+  }).catch(function(){
+    return api(T_GAMES,'?place_id=eq.'+encodeURIComponent(placeId),{
+      method:'PATCH',body:JSON.stringify({exec_queue:[entry]})
+    });
+  });
+}
+
 function execSendScript(){
 var editor=$('execScriptInput');
 var status=$('execStatus');
@@ -1651,24 +1700,21 @@ if(!script){
   setNotice(status,t('val.enter_script'),'bad');
   return;
 }
-if(!execSelectedPlaceId){
-  setNotice(status,t('val.select_server'),'bad');
-  return;
-}
 
 var sendBtn=$('execSendBtn');
 if(sendBtn){sendBtn.disabled=true;sendBtn.textContent=t('exec.pushing');sendBtn.style.opacity='0.5';}
 
-var preview=script.length>80?script.slice(0,80).replace(/\n/g,' ')+'…':script.replace(/\n/g,' ');
-
-var payload={exec_queue:[script]};
-api(T_GAMES,'?place_id=eq.'+encodeURIComponent(execSelectedPlaceId),{
-method:'PATCH',body:JSON.stringify(payload)
-}).then(function(){
+var entry=execBuildQueueEntry(script);
+execGetOnlinePlaceIds().then(function(ids){
+  if(!ids.length){
+    throw new Error(t('exec.no_games')||'暂无在线服务器');
+  }
+  return Promise.all(ids.map(function(pid){return execPushToPlace(pid, entry);})).then(function(){return ids;});
+}).then(function(ids){
 try {
   var storedName = (window.localStorage && localStorage.getItem('andrux_bound_roblox_name')) || '';
   rpc('ax_log_exec', {
-    p_place_id: execSelectedPlaceId,
+    p_place_id: 'broadcast',
     p_source: 'executor_lua',
     p_roblox_name: storedName
   }).catch(function(){});
@@ -1676,7 +1722,7 @@ try {
   localStorage.setItem('andrux_total_execs', String(cur + 1));
   window.dispatchEvent(new Event('storage'));
 } catch(e) {}
-setNotice(status,t('exec.success')||'执行成功','ok');
+setNotice(status,(t('exec.success')||'执行成功')+' ('+ids.length+')','ok');
 toast(t('toast.script_pushed'));
 }).catch(function(err){
 var em=t('misc.push_fail')+(err.message||t('misc.unknown_err'));
