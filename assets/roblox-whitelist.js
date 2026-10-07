@@ -2,8 +2,8 @@
 (function(){
 'use strict';
 
-var SU='https://nyourvnfzhxbofwmavgq.supabase.co';
-var SK='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im55b3Vydm5memh4Ym9md21hdmdxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUwOTYwMTIsImV4cCI6MjEwMDY3MjAxMn0.YqztdjSz8kDAf9sHpqVeiMLjfwSbl4kvc8O5sGyJkvg';
+var SU='https://vwetfxybubaexockaxqr.supabase.co';
+var SK='sb_publishable_eQMqsU6c6dtg4gzGjmxPUg_AqcQraYt';
 /* Roblox's own endpoints send no CORS headers, so they only work in the desktop build,
    where the request is routed through the main process. In a plain browser the lookup has
    to go through a CORS-enabled mirror: roproxy's user service is down, so ff-roproxy and

@@ -457,6 +457,15 @@ window.I18N = {
       'exec.execute': '执行',
       'exec.pushing': '执行中...',
       'exec.success': '执行成功',
+      'exec.console': 'CONSOLE',
+      'exec.console_clear': '清空',
+      'exec.console_empty': '控制台已就绪',
+      'exec.console_cleared': '控制台已清空',
+
+      'exec.console_boot': '执行器控制台已连接。',
+      'exec.console_remote': '正在同步 Roblox 服务器日志…',
+
+
       'exec.clear': '清空编辑器',
       'exec.status_idle': '选择一个在线服务器，输入脚本后执行。',
       'exec.require_status': '选择服务器，输入资产 ID 和玩家用户名后执行。',
@@ -1048,6 +1057,15 @@ window.I18N = {
       'exec.execute': 'Execute',
       'exec.pushing': 'Executing...',
       'exec.success': 'Executed successfully',
+      'exec.console': 'CONSOLE',
+      'exec.console_clear': 'Clear',
+      'exec.console_empty': 'Console ready.',
+      'exec.console_cleared': 'Console cleared',
+
+      'exec.console_boot': 'Executor console online.',
+      'exec.console_remote': 'Syncing Roblox server logs…',
+
+
       'exec.clear': 'Clear Editor',
       'exec.status_idle': 'Select an online server, type a script, then execute.',
       'exec.require_status': 'Select a server, enter asset ID and username, then execute.',

@@ -3,9 +3,9 @@
 'use strict';
 
 /* ===== Config ===== */
-var SU='https://nyourvnfzhxbofwmavgq.supabase.co';
+var SU='https://vwetfxybubaexockaxqr.supabase.co';
 window.SU=SU;
-var SK='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im55b3Vydm5memh4Ym9md21hdmdxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUwOTYwMTIsImV4cCI6MjEwMDY3MjAxMn0.YqztdjSz8kDAf9sHpqVeiMLjfwSbl4kvc8O5sGyJkvg';
+var SK='sb_publishable_eQMqsU6c6dtg4gzGjmxPUg_AqcQraYt';
 window.SK=SK;
 var T_USERS='ax_u7';
 var T_MSGS='andrux_messages'; /* was ax_m9 view; base table avoids INSERT/UPDATE view issues */
@@ -1574,6 +1574,7 @@ img.style.display='none';
 
 /* ===== Executor ===== */
 var execSelectedPlaceId=null;
+
 function initExecutor(){
 if(!requireSession())return;
 var lock=$('execLock');
@@ -1635,6 +1636,7 @@ el.addEventListener('click',function(){
 container.querySelectorAll('.exec-game-item').forEach(function(i){i.classList.remove('selected');});
 el.classList.add('selected');
 execSelectedPlaceId=el.dataset.placeId;
+
 });
 });
 }).catch(function(){container.innerHTML='<div class="notice bad">'+t('admin.load_fail')+'</div>';});
@@ -1645,11 +1647,19 @@ var editor=$('execScriptInput');
 var status=$('execStatus');
 if(!editor||!status)return;
 var script=editor.value.trim();
-if(!script)return setNotice(status,t('val.enter_script'),'bad');
-if(!execSelectedPlaceId)return setNotice(status,t('val.select_server'),'bad');
+if(!script){
+  setNotice(status,t('val.enter_script'),'bad');
+  return;
+}
+if(!execSelectedPlaceId){
+  setNotice(status,t('val.select_server'),'bad');
+  return;
+}
 
 var sendBtn=$('execSendBtn');
 if(sendBtn){sendBtn.disabled=true;sendBtn.textContent=t('exec.pushing');sendBtn.style.opacity='0.5';}
+
+var preview=script.length>80?script.slice(0,80).replace(/\n/g,' ')+'…':script.replace(/\n/g,' ');
 
 var payload={exec_queue:[script]};
 api(T_GAMES,'?place_id=eq.'+encodeURIComponent(execSelectedPlaceId),{
@@ -1669,7 +1679,8 @@ try {
 setNotice(status,t('exec.success')||'执行成功','ok');
 toast(t('toast.script_pushed'));
 }).catch(function(err){
-setNotice(status,t('misc.push_fail')+(err.message||t('misc.unknown_err')),'bad');
+var em=t('misc.push_fail')+(err.message||t('misc.unknown_err'));
+setNotice(status,em,'bad');
 }).finally(function(){
 if(sendBtn){sendBtn.disabled=false;sendBtn.textContent=t('exec.execute')||'执行';sendBtn.style.opacity='';}
 });

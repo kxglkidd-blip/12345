@@ -8,8 +8,8 @@
 (function(){
 'use strict';
 
-var SU='https://nyourvnfzhxbofwmavgq.supabase.co';
-var SK='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im55b3Vydm5memh4Ym9md21hdmdxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUwOTYwMTIsImV4cCI6MjEwMDY3MjAxMn0.YqztdjSz8kDAf9sHpqVeiMLjfwSbl4kvc8O5sGyJkvg';
+var SU='https://vwetfxybubaexockaxqr.supabase.co';
+var SK='sb_publishable_eQMqsU6c6dtg4gzGjmxPUg_AqcQraYt';
 /* Roblox's own host sends no CORS header, so it is only reachable from the desktop build
    (main-process proxy). A plain browser has to use a CORS-enabled mirror; roproxy's user
    service is down, so ff-roproxy and rotunnel carry the lookup. */
@@ -96,7 +96,7 @@ var _loading=false;
 
 /* ===== Load games from Supabase (BUG FIX: was reading localStorage only) ===== */
 /* Filter: status=online AND hidden=false AND heartbeat within 60s (must match the game page) */
-var STALE_MS=60000; /* 60s without heartbeat = offline (heartbeat interval ~30s) */
+var STALE_MS=90000; /* 90s without heartbeat = offline (heartbeat interval ~10s) */
 function isGameAlive(g){
   if(!g||g.status!=='online')return false;
   if(!g.last_heartbeat)return false;
@@ -105,14 +105,22 @@ function isGameAlive(g){
   return (Date.now()-hb)<=STALE_MS;
 }
 function loadGames(){
-  return apiGet('game_status?select=*&status=eq.online&hidden=eq.false&order=last_heartbeat.desc')
+    return apiGet('ax_gs?select=*&order=last_heartbeat.desc&limit=100')
   .then(function(rows){
-    /* Frontend safety: even if DB says online, stale heartbeat counts as offline */
-    var alive=(rows||[]).filter(isGameAlive);
+    /* Online = status online (or missing) + not hidden + heartbeat within STALE_MS */
+    var alive=(rows||[]).filter(function(g){
+      if(!g)return false;
+      if(g.hidden===true)return false;
+      if(g.status && g.status!=='online')return false;
+      if(!g.last_heartbeat)return false;
+      var hb=new Date(g.last_heartbeat).getTime();
+      if(isNaN(hb))return false;
+      return (Date.now()-hb)<=STALE_MS;
+    });
     onlineGames=alive;
     totalPlayers=0;
     for(var i=0;i<onlineGames.length;i++){
-      totalPlayers+=(onlineGames[i].player_count||0);
+      totalPlayers+=(parseInt(onlineGames[i].player_count,10)||0);
     }
     // Also cache to localStorage for other pages that still read from there
     try{

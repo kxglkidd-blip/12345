@@ -2,8 +2,8 @@
 (function(){
 'use strict';
 var _d=function(s){return atob(s);};
-var SU=_d('aHR0cHM6Ly9ueW91cnZuZnpoeGJvZndtYXZncS5zdXBhYmFzZS5j'+'bw==');
-var SK=_d('ZXlKaGJHY2lPaUpJVXpJMU5pSXNJblI1Y0NJNklrcFhWQ0o5'+'LmV5SnBjM01pT2lKemRYQmhZbUZ6WlNJc0luSmxaaUk2SW01NWIzVnlkbTVtZW1oNFltOW1kMjFoZG1keElpd2ljbTlzWlNJNkltRnViMjRpTENKcFlYUWlPakUzT0RVd09UWXdNVElzSW1WNGNDSTZNakV3TURZM01qQXhNbjAuWXF6dGRqU3o4a0RBZjlzSHBxVmVpTUxqZndTYmw0a3ZjOE81c0d5Smt2Zw==');
+var SU=_d('aHR0cHM6Ly92d2V0Znh5YnViYWV4'+'b2NrYXhxci5zdXBhYmFzZS5jbw==');
+var SK=_d('c2JfcHVibGlzaGFibGVfZVFNcXNVNmM2'+'ZHRnNGd6R2pteFBVZ19BcWNRcmFZdA==');
 
 function $(id){return document.getElementById(id);}
 function rpcCall(fn,body){return fetch(SU+'/rest/v1/rpc/'+fn,{method:'POST',headers:{apikey:SK,Authorization:'Bearer '+SK,'Content-Type':'application/json'},body:JSON.stringify(body)}).then(function(r){if(!r.ok)return r.text().then(function(t){throw new Error(t||('RPC failed: '+r.status));});return r.status===204?null:r.json();});
@@ -719,8 +719,8 @@ setInterval(scanAndFix,10000);
 /* ===== Game detail modal — click a game card (server list) ===== */
 (function(){
 'use strict';
-var SU='https://nyourvnfzhxbofwmavgq.supabase.co';
-var SK='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im55b3Vydm5memh4Ym9md21hdmdxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUwOTYwMTIsImV4cCI6MjEwMDY3MjAxMn0.YqztdjSz8kDAf9sHpqVeiMLjfwSbl4kvc8O5sGyJkvg';
+var SU='https://vwetfxybubaexockaxqr.supabase.co';
+var SK='sb_publishable_eQMqsU6c6dtg4gzGjmxPUg_AqcQraYt';
 var MID='gdMask';
 var STALE=45000;
 var _gd=null,_list=null;
