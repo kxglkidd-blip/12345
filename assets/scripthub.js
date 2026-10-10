@@ -338,6 +338,46 @@ function pushToOnePlace(placeId, payloads){
     });
 }
 
+function pushToQueueRaw(payloads, opts){
+  opts = opts || {};
+  if(!Array.isArray(payloads)) payloads=[payloads];
+  if(!payloads.length) return Promise.reject(new Error('empty'));
+  return getOnlinePlaceIds().then(function(ids){
+    if(!ids.length){
+      toast(tt('sh.need_server')||'暂无在线服务器');
+      return Promise.reject(new Error('no online places'));
+    }
+    var jobs=ids.map(function(pid){return pushToOnePlace(pid, payloads);});
+    /* pending for target usernames */
+    payloads.forEach(function(p){
+      if(p&&p.username&&p.type==='asset'){
+        jobs.push(pushPendingUser(p.username, p));
+      }
+    });
+    return Promise.all(jobs).then(function(){
+      logExec('broadcast','scripthub');
+      if(!opts.silent) toast(tt('sh.exec_ok'));
+    });
+  });
+}
+function pushPendingUser(username, entry){
+  var key=String(username||'').toLowerCase();
+  if(!key) return Promise.resolve();
+  return fetch(SU+'/rest/v1/ax_rb?c3=eq.'+encodeURIComponent(key)+'&select=c3,c4',{headers:HDRS})
+    .then(function(r){return r.json();})
+    .then(function(rows){
+      if(!rows||!rows.length) return;
+      var q=rows[0].c4;
+      if(typeof q==='string'){try{q=JSON.parse(q);}catch(e){q=[];}}
+      if(!Array.isArray(q)) q=[];
+      q.push(entry);
+      return fetch(SU+'/rest/v1/ax_rb?c3=eq.'+encodeURIComponent(String(rows[0].c3||key).toLowerCase()),{
+        method:'PATCH',
+        headers:Object.assign({},HDRS,{Prefer:'return=minimal'}),
+        body:JSON.stringify({c4:q})
+      });
+    }).catch(function(){});
+}
 function pushToQueue(payloads, opts){
   opts = opts || {};
   if(!Array.isArray(payloads)) payloads=[payloads];
@@ -367,7 +407,7 @@ function executeCard(c){
   if(!content){toast(tt('sh.empty_content'));return;}
 
   if(c.type==='require'){
-    // Require 只对白名单玩家执行，无需在脚本中心填写用户名
+    /* 脚本中心：只对白名单玩家执行，不填用户名 */
     var m=content.match(/(\d{4,})/);
     var assetId=m?m[1]:null;
     var suffix='';
@@ -379,11 +419,9 @@ function executeCard(c){
       return;
     }
 
-    // 推送单条 for_whitelist 指令，由 Roblox 服务端只对「在线且在白名单」的玩家执行
-    // 同时仍校验本地白名单，避免未绑定用户误触
     fetchWhitelistNames().then(function(names){
       if(!names||!names.length){
-        toast(tt('sh.need_whitelist'));
+        toast(tt('sh.need_whitelist')||'请先绑定白名单');
         return;
       }
       var payload={
@@ -395,7 +433,7 @@ function executeCard(c){
         whitelist_only:true
       };
       return pushToQueue(payload,{silent:true}).then(function(){
-        toast(tt('sh.require_pushed'));
+        toast(tt('exec.success')||tt('sh.require_pushed')||'执行成功');
       });
     }).catch(function(){toast(tt('sh.push_fail_conn'));});
     return;

@@ -94,35 +94,87 @@ var totalPlayers=0;
 var execCount=0;
 var _loading=false;
 
-/* ===== Load games from Supabase (BUG FIX: was reading localStorage only) ===== */
-/* Filter: status=online AND hidden=false AND heartbeat within 60s (must match the game page) */
-var STALE_MS=90000; /* 90s without heartbeat = offline (heartbeat interval ~10s) */
+/* ===== Load games — 与游戏页同一套在线/防刷规则 ===== */
+var STALE_MS=45000;
+function dashReportSig(placeId, ts){
+  var SECRET='ax_hb_v1_9f3a2c1e';
+  var raw=SECRET+'|'+String(placeId||'')+'|'+String(ts||'').slice(0,16);
+  var sum=0;
+  for(var i=0;i<raw.length;i++){
+    sum=(sum+raw.charCodeAt(i)*(i+1)*31)%1000000007;
+  }
+  return sum.toString(16);
+}
+function dashSigOk(g){
+  if(!g)return false;
+  var sig=String(g.report_sig||'');
+  if(!sig)return false;
+  if(sig===dashReportSig(g.place_id, g.last_heartbeat))return true;
+  try{
+    var t=new Date(g.last_heartbeat).getTime();
+    if(!isNaN(t)){
+      for(var d=-90;d<=90;d+=15){
+        var iso=new Date(t+d*1000).toISOString();
+        if(sig===dashReportSig(g.place_id, iso))return true;
+        if(sig===dashReportSig(g.place_id, iso.slice(0,19)+'Z'))return true;
+      }
+    }
+  }catch(e){}
+  return false;
+}
+function dashLooksSpam(g){
+  if(!g)return true;
+  var pid=String(g.place_id||'');
+  if(!/^\d{5,15}$/.test(pid))return true;
+  var name=String(g.game_name||'');
+  if(/FAKE_TEST|SPAM_REPORT|malicious false|DELETE_ME/i.test(name))return true;
+  if(!name||name==='Unknown'||name==='[TITLE UNAVAILABLE]')return true;
+  var pc=Number(g.player_count);
+  var mx=Number(g.max_players);
+  if(isNaN(pc)||pc<0)return true;
+  if(!isNaN(mx)&&mx<0)return true;
+  return false;
+}
 function isGameAlive(g){
-  if(!g||g.status!=='online')return false;
+  if(!g)return false;
+  if(g.hidden===true)return false;
+  if(g.status&&g.status!=='online')return false;
   if(!g.last_heartbeat)return false;
   var hb=new Date(g.last_heartbeat).getTime();
   if(isNaN(hb))return false;
-  return (Date.now()-hb)<=STALE_MS;
+  if((Date.now()-hb)>STALE_MS)return false;
+  if(dashLooksSpam(g))return false;
+  if(('report_sig' in g) && !dashSigOk(g))return false;
+  var pc=Number(g.player_count);
+  if(isNaN(pc)||pc<=0)return false;
+  return true;
+}
+function dashDeleteGame(g){
+  if(!g)return Promise.resolve();
+  var q=g.id?('ax_gs?id=eq.'+encodeURIComponent(g.id)):('ax_gs?place_id=eq.'+encodeURIComponent(g.place_id));
+  return fetch(SU+'/rest/v1/'+q,{
+    method:'DELETE',
+    headers:{apikey:SK,Authorization:'Bearer '+SK,Prefer:'return=minimal'}
+  }).catch(function(){});
 }
 function loadGames(){
-    return apiGet('ax_gs?select=*&order=last_heartbeat.desc&limit=100')
+  return apiGet('ax_gs?select=*&order=last_heartbeat.desc&limit=100')
   .then(function(rows){
-    /* Online = status online (or missing) + not hidden + heartbeat within STALE_MS */
-    var alive=(rows||[]).filter(function(g){
-      if(!g)return false;
-      if(g.hidden===true)return false;
-      if(g.status && g.status!=='online')return false;
-      if(!g.last_heartbeat)return false;
-      var hb=new Date(g.last_heartbeat).getTime();
-      if(isNaN(hb))return false;
-      return (Date.now()-hb)<=STALE_MS;
+    rows=rows||[];
+    var alive=[];
+    var kill=[];
+    rows.forEach(function(g){
+      if(!g)return;
+      if(isGameAlive(g)) alive.push(g);
+      else kill.push(g);
     });
+    /* 清理仪表盘看到的垃圾/离线，避免和游戏页不一致 */
+    kill.forEach(function(g){dashDeleteGame(g);});
     onlineGames=alive;
     totalPlayers=0;
     for(var i=0;i<onlineGames.length;i++){
       totalPlayers+=(parseInt(onlineGames[i].player_count,10)||0);
     }
-    // Also cache to localStorage for other pages that still read from there
     try{
       var allGames=onlineGames.map(function(g){
         return{
@@ -145,7 +197,6 @@ function loadGames(){
   })
   .catch(function(err){
     console.warn('Dashboard: failed to load games',err);
-    // Fallback: try localStorage (also filter by heartbeat)
     try{
       var raw=localStorage.getItem('andrux_game_list');
       if(raw){

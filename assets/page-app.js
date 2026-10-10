@@ -171,17 +171,62 @@ function trackMouse(){
   },8000);
 }
 
-/* Anti-debug traps — lightweight, no console pollution */
+/* Anti-debug / anti-inspect — deter casual element & app inspection */
 function antiDebug(){
-  /* 1. Debugger detection only — no infinite loop to avoid freezing legit users */
+  var _dtHits=0;
+  function veilOn(){
+    try{
+      var v=document.getElementById('__ax_dt_veil');
+      if(!v){
+        v=document.createElement('div');
+        v.id='__ax_dt_veil';
+        v.setAttribute('style','position:fixed;inset:0;z-index:2147483646;background:#0d0b09;color:#c9b8a0;display:flex;align-items:center;justify-content:center;font:16px/1.5 system-ui,sans-serif;text-align:center;padding:24px;');
+        v.textContent=' ';
+        document.documentElement.appendChild(v);
+      }
+      v.style.display='flex';
+      try{document.body.style.visibility='hidden';}catch(e){}
+    }catch(e){}
+  }
+  function veilOff(){
+    try{
+      var v=document.getElementById('__ax_dt_veil');
+      if(v)v.style.display='none';
+      document.body.style.visibility='';
+    }catch(e){}
+  }
+  function onSuspect(flag){
+    try{
+      if(SEC.vmFlags.indexOf(flag)<0)SEC.vmFlags.push(flag);
+      _dtHits++;
+      /* continuous console wipe */
+      try{console.clear();}catch(e){}
+      try{console.log=console.info=console.warn=console.error=console.debug=function(){};}catch(e){}
+      if(_dtHits>=2){
+        veilOn();
+        try{
+          getIP().then(function(ip){
+            rpcCall('record_suspicious',{
+              p_ip:ip||'',
+              p_user_id:session?session.id:null,
+              p_score:90,
+              p_flags:SEC.vmFlags.join(','),
+              p_fp:SEC.fpHash
+            }).catch(function(){});
+          });
+        }catch(e){}
+      }
+    }catch(e){}
+  }
+
+  /* 1. debugger timing */
   (function check(){
     var start=performance.now();
+    /* eslint-disable no-debugger */
     debugger;
     var end=performance.now();
-    if(end-start>100){
-      SEC.vmFlags.push('debugger_open');
-    }
-    setTimeout(check,4000);
+    if(end-start>120){onSuspect('debugger_open');}
+    setTimeout(check,3000);
   })();
 
   /* 2. Performance baseline — VMs are slower */
@@ -191,16 +236,37 @@ function antiDebug(){
   SEC.perfBaseline=t1-t0;
   if(SEC.perfBaseline>80){SEC.vmFlags.push('slow_js');}
 
-  /* 3. Detect devtools open via window size difference */
-  var threshold=160;
+  /* 3. Docked DevTools size gap (desktop) */
+  var threshold=180;
   (function checkSize(){
-    var w=window.outerWidth-window.innerWidth;
-    var h=window.outerHeight-window.innerHeight;
-    if(w>threshold||h>threshold){
-      SEC.vmFlags.push('devtools_size');
-    }
-    setTimeout(checkSize,5000);
+    try{
+      var w=window.outerWidth-window.innerWidth;
+      var h=window.outerHeight-window.innerHeight;
+      if(w>threshold||h>threshold){onSuspect('devtools_size');}
+      else if(_dtHits>0 && w<=threshold && h<=threshold){veilOff();_dtHits=Math.max(0,_dtHits-1);}
+    }catch(e){}
+    setTimeout(checkSize,2000);
   })();
+
+  /* 4. console open probe (toString trap) */
+  (function consoleProbe(){
+    var el=new Image();
+    var probed=false;
+    Object.defineProperty(el,'id',{get:function(){probed=true;onSuspect('console_probe');}});
+    try{console.log('%c',el);}catch(e){}
+    try{console.clear();}catch(e){}
+    setTimeout(consoleProbe,4000);
+  })();
+
+  /* 5. periodic console clear */
+  setInterval(function(){try{console.clear();}catch(e){}},1500);
+
+  /* 6. block common inspection globals from casual use */
+  try{
+    ['__REACT_DEVTOOLS_GLOBAL_HOOK__','__VUE_DEVTOOLS_GLOBAL_HOOK__'].forEach(function(k){
+      try{Object.defineProperty(window,k,{get:function(){onSuspect('devtools_hook');return undefined;},set:function(){}});}catch(e){}
+    });
+  }catch(e){}
 }
 
 /* Honey trap: hidden bait element only — no DOM API hijacking */
@@ -565,11 +631,29 @@ $qa('.nav-btn').forEach(function(btn){
 btn.addEventListener('click',function(){
 var href=btn.dataset.href;
 if(href)location.href=href;
-if(sidebar)sidebar.classList.remove('open');
+if(typeof setSidebarOpen==='function')setSidebarOpen(false);else if(typeof setSidebarOpen==='function')setSidebarOpen(false);else if(sidebar){sidebar.classList.remove('open');document.body.classList.remove('sidebar-open');}
 });
 });
 
-if(mobileMenu)mobileMenu.addEventListener('click',function(){if(sidebar)sidebar.classList.toggle('open');});
+function setSidebarOpen(open){
+  if(!sidebar)return;
+  if(open){sidebar.classList.add('open');document.body.classList.add('sidebar-open');}
+  else{sidebar.classList.remove('open');document.body.classList.remove('sidebar-open');}
+}
+if(mobileMenu)mobileMenu.addEventListener('click',function(e){
+  e.preventDefault();
+  e.stopPropagation();
+  setSidebarOpen(!(sidebar&&sidebar.classList.contains('open')));
+});
+/* 手机：点左侧栏外侧任意区域关闭菜单 */
+function closeSidebarOutside(e){
+  if(!sidebar||!sidebar.classList.contains('open'))return;
+  if(sidebar.contains(e.target))return;
+  if(mobileMenu&&mobileMenu.contains(e.target))return;
+  setSidebarOpen(false);
+}
+document.addEventListener('click',closeSidebarOutside,true);
+document.addEventListener('touchstart',closeSidebarOutside,{passive:true,capture:true});
 if(logoutBtn)logoutBtn.addEventListener('click',doLogout);
 if(mobileLogout)mobileLogout.addEventListener('click',doLogout);
 
@@ -1104,6 +1188,15 @@ var input=$('fileInput');if(input)input.value='';
 /* ===== Admin ===== */
 function initAdmin(){
 if(!requireSession())return;
+
+/* Admin community: only 聊天群 */
+(function(){
+  var sel=$('adminChannel');
+  if(!sel)return;
+  sel.innerHTML='<option value="general">'+((t('comm.channel_general')||'聊天群'))+'</option>';
+  sel.value='general';
+})();
+
 var lock=$('adminLock');
 var panel=$('adminPanel');
 var form=$('adminLoginForm');
@@ -1185,19 +1278,34 @@ function loadAdminGames(){
 var container=$('adminGames');if(!container)return;
 container.classList.add('ax-stagger');
 var showAll=$('adminShowHiddenGames');
-var filter=showAll&&showAll.checked?'':'&hidden=eq.false';
-api(T_GAMES,'?select=*&order=last_heartbeat.desc.nullslast&limit=50'+filter).then(function(rows){
-if(!rows||!rows.length){container.innerHTML='<div class="notice">'+t('admin.no_games')+'</div>';return;}
+/* 拉取全部，客户端过滤：hidden=null 的 Studio/新行也能显示 */
+api(T_GAMES,'?select=*&order=last_heartbeat.desc.nullslast&limit=100',{skipRate:true}).then(function(rows){
+rows=rows||[];
+var showHidden=!!(showAll&&showAll.checked);
+rows=rows.filter(function(g){
+  if(!g)return false;
+  if(showHidden)return true;
+  return g.hidden!==true; /* null/false 都显示，含 Studio */
+});
+if(!rows.length){container.innerHTML='<div class="notice">'+t('admin.no_games')+'</div>';return;}
 container.innerHTML=rows.map(function(g){
-var isHidden=!!g.hidden;
+var isHidden=g.hidden===true;
+var isStudio=!!(g.is_studio===true||g.is_studio===1||g.is_studio==='true');
 var statusCls=isHidden?'mini-btn danger':'mini-btn';
-var statusText=isHidden?t('admin.restore_game'):t('admin.hide_game');
+var statusText=isHidden?(t('admin.restore_game')||'恢复'):(t('admin.hide_game')||'隐藏');
 var hb=g.last_heartbeat?new Date(g.last_heartbeat).toLocaleString(window.I18N&&window.I18N.lang==='en'?'en-US':'zh-CN'):'';
-return '<div class="admin-item" data-id="'+escapeAttr(g.id)+'">'+
-'<div class="admin-item-top"><b>'+escapeHTML(g.game_name||'Unknown')+'<small style="color:var(--muted);font-weight:400;margin-left:8px">'+escapeHTML(g.place_id)+'</small></b><span>'+(hb||t('admin.no_heartbeat'))+'</span></div>'+(g.description?'<div style="font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escapeHTML(g.description).slice(0,100)+'</div>':'')+
+var tag=isStudio?' <small style="color:var(--accent);font-weight:600">[Studio]</small>':'';
+var gid=g.id||'';
+var pid=g.place_id||'';
+return '<div class="admin-item" data-id="'+escapeAttr(gid)+'" data-place-id="'+escapeAttr(pid)+'">'+
+'<div class="admin-item-top"><b>'+escapeHTML(g.game_name||'Unknown')+tag+'<small style="color:var(--muted);font-weight:400;margin-left:8px">'+escapeHTML(pid)+'</small></b><span>'+(hb||t('admin.no_heartbeat'))+'</span></div>'+(g.description?'<div style="font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escapeHTML(g.description).slice(0,100)+'</div>':'')+
 '<div class="admin-actions">'+
-'<button class="'+statusCls+'" data-action="toggle-game" data-gid="'+escapeAttr(g.id)+'" data-hidden="'+!isHidden+'">'+statusText+'</button>'+
-'</div></div>';}).join('');}).catch(function(){container.innerHTML='<div class="notice bad">'+t('admin.load_fail')+'</div>';});}
+'<button class="'+statusCls+'" data-action="toggle-game" data-gid="'+escapeAttr(gid)+'" data-place-id="'+escapeAttr(pid)+'" data-hidden="'+(isHidden?'false':'true')+'">'+statusText+'</button>'+
+'<button class="mini-btn danger" data-action="delete-game" data-gid="'+escapeAttr(gid)+'" data-place-id="'+escapeAttr(pid)+'">'+(t('admin.delete')||'删除')+'</button>'+
+'</div></div>';
+}).join('');
+}).catch(function(){container.innerHTML='<div class="notice bad">'+t('admin.load_fail')+'</div>';});
+}
 
 
 function loadAdminHubCards(){
@@ -1273,9 +1381,23 @@ var uid=btn.dataset.uid;
 var mid=btn.dataset.mid;
 
 if(action==='delete-user'&&uid){
-if(!confirm(t('misc.confirm_delete_user')))return;
-api(T_USERS,'?c0=eq.'+encodeURIComponent(uid),{method:'DELETE'}).then(function(){
-toast(t('toast.deleted_user'));loadAdminUsers();
+if(!confirm(t('misc.confirm_delete_user')||'确定删除该账户？其白名单与社区发言将一并删除。'))return;
+/* 先取用户名，再删消息、白名单、账户 */
+api(T_USERS,'?c0=eq.'+encodeURIComponent(uid)+'&select=c0,c1',{skipRate:true}).then(function(rows){
+  var uname=(rows&&rows[0]&&rows[0].c1)?String(rows[0].c1):'';
+  var jobs=[];
+  jobs.push(api(T_MSGS,'?c1=eq.'+encodeURIComponent(uid),{method:'DELETE',skipRate:true}).catch(function(){}));
+  if(uname){
+    jobs.push(api(T_MSGS,'?c2=eq.'+encodeURIComponent(uname),{method:'DELETE',skipRate:true}).catch(function(){}));
+    jobs.push(api('ax_rb','?c1=eq.'+encodeURIComponent(uname),{method:'DELETE',skipRate:true}).catch(function(){}));
+    jobs.push(api('ax_rb','?c1=eq.'+encodeURIComponent(uname.toLowerCase()),{method:'DELETE',skipRate:true}).catch(function(){}));
+  }
+  jobs.push(api(T_USERS,'?c0=eq.'+encodeURIComponent(uid),{method:'DELETE',skipRate:true}));
+  return Promise.all(jobs);
+}).then(function(){
+  toast(t('toast.deleted_user')||'账户及相关数据已删除');
+  loadAdminUsers();
+  loadAdminMessages();
 }).catch(function(){toast(t('toast.delete_fail'));});
 }
 
@@ -1315,12 +1437,48 @@ toast(t('toast.deleted_user'));loadAdminMessages();
 }
 
 if(action==='toggle-game'){
-var gid=btn.dataset.gid;
+var gid=btn.dataset.gid||'';
+var pid=btn.dataset.placeId||btn.getAttribute('data-place-id')||'';
 var hide=btn.dataset.hidden==='true';
-if(!gid)return;
-api(T_GAMES,'?id=eq.'+encodeURIComponent(gid),{method:'PATCH',body:JSON.stringify({hidden:hide})}).then(function(){
-toast(hide?t('toast.game_hidden'):t('toast.game_restored'));loadAdminGames();
-}).catch(function(){toast(t('toast.op_fail'));});
+var q='';
+if(gid) q='?id=eq.'+encodeURIComponent(gid);
+else if(pid) q='?place_id=eq.'+encodeURIComponent(pid);
+else return;
+api(T_GAMES,q,{method:'PATCH',body:JSON.stringify({hidden:hide}),skipRate:true}).then(function(){
+toast(hide?(t('toast.game_hidden')||'已隐藏'):(t('toast.game_restored')||'已恢复'));
+loadAdminGames();
+}).catch(function(){
+  /* 若 id 失败，再试 place_id */
+  if(gid&&pid){
+    return api(T_GAMES,'?place_id=eq.'+encodeURIComponent(pid),{method:'PATCH',body:JSON.stringify({hidden:hide}),skipRate:true}).then(function(){
+      toast(hide?(t('toast.game_hidden')||'已隐藏'):(t('toast.game_restored')||'已恢复'));
+      loadAdminGames();
+    });
+  }
+  toast(t('toast.op_fail'));
+});
+}
+
+if(action==='delete-game'){
+var gid=btn.dataset.gid||'';
+var pid=btn.dataset.placeId||btn.getAttribute('data-place-id')||'';
+if(!confirm(t('admin.confirm_delete_game')||'确定删除该游戏上报？'))return;
+var q='';
+if(gid) q='?id=eq.'+encodeURIComponent(gid);
+else if(pid) q='?place_id=eq.'+encodeURIComponent(pid);
+else return;
+api(T_GAMES,q,{method:'DELETE',skipRate:true}).then(function(){
+toast(t('toast.game_deleted')||'已删除游戏');
+loadAdminGames();
+}).catch(function(){
+  if(gid&&pid){
+    return api(T_GAMES,'?place_id=eq.'+encodeURIComponent(pid),{method:'DELETE',skipRate:true}).then(function(){
+      toast(t('toast.game_deleted')||'已删除游戏');
+      loadAdminGames();
+    });
+  }
+  toast(t('toast.delete_fail'));
+});
 }
 
 
@@ -1389,6 +1547,63 @@ var settingsLogout=$('settingsLogoutBtn');
 if(settingsLogout)settingsLogout.addEventListener('click',function(){doLogout();});
 
 /* Clear local */
+
+/* LOGO toggle (whitelist players only in-game) — stored in ax_rb.c7 (c5 is Roblox userId) */
+var logoToggle=$('settingShowLogo');
+if(logoToggle){
+  var logoOn=localStorage.getItem('andrux_show_logo');
+  if(logoOn===null)logoOn='1';
+  logoToggle.checked=logoOn!=='0';
+  function syncLogoPref(on){
+    localStorage.setItem('andrux_show_logo',on?'1':'0');
+    var val=on?'1':'0';
+    var tasks=[];
+    /* all bound names from local cache */
+    try{
+      var cache=JSON.parse(localStorage.getItem('andrux_rbx_whitelist')||'[]');
+      if(Array.isArray(cache)){
+        cache.forEach(function(b){
+          var n=String(b.username||b.name||b.roblox_name||'').trim();
+          if(!n)return;
+          tasks.push(api('ax_rb','?c3=eq.'+encodeURIComponent(n.toLowerCase()),{
+            method:'PATCH',body:JSON.stringify({c7:val})
+          }).catch(function(){
+            return api('ax_rb','?c3=ilike.'+encodeURIComponent(n.toLowerCase()),{
+              method:'PATCH',body:JSON.stringify({c7:val})
+            }).catch(function(){});
+          }));
+        });
+      }
+    }catch(e){}
+    try{
+      var one=(localStorage.getItem('andrux_bound_roblox_name')||'').trim();
+      if(one){
+        tasks.push(api('ax_rb','?c3=eq.'+encodeURIComponent(one.toLowerCase()),{
+          method:'PATCH',body:JSON.stringify({c7:val})
+        }).catch(function(){}));
+      }
+    }catch(e){}
+    /* also by website username if column c1 matches */
+    try{
+      if(session&&session.username){
+        tasks.push(api('ax_rb','?c1=eq.'+encodeURIComponent(session.username),{
+          method:'PATCH',body:JSON.stringify({c7:val})
+        }).catch(function(){}));
+      }
+    }catch(e){}
+    return Promise.all(tasks);
+  }
+  logoToggle.addEventListener('change',function(){
+    var on=!!logoToggle.checked;
+    logoToggle.disabled=true;
+    syncLogoPref(on).then(function(){
+      toast(on?(t('set.logo_on')||'已开启 LOGO'):(t('set.logo_off')||'已关闭 LOGO'));
+    }).catch(function(){
+      toast(on?(t('set.logo_on')||'已开启 LOGO'):(t('set.logo_off')||'已关闭 LOGO'));
+    }).finally(function(){logoToggle.disabled=false;});
+  });
+}
+
 var clearBtn=$('clearLocalBtn');
 if(clearBtn)clearBtn.addEventListener('click',function(){
 if(!confirm(t('misc.confirm_clear_local')))return;
@@ -1424,7 +1639,7 @@ toast(t('toast.lang_updated'));
 function initGame(){
 if(!requireSession())return;
 loadGameStatus();
-gameTimer=setInterval(loadGameStatus,10000);
+gameTimer=setInterval(loadGameStatus,5000);
 }
 
 /* Cover art: the heartbeat used to fetch the game icon through a mirror that is now dead, so
@@ -1521,18 +1736,157 @@ if(!jobs.length)return Promise.resolve(false);
 return Promise.all(jobs).then(function(){return true;});
 }
 
+/* 与 Roblox 模块一致的上报签名（防随意 POST 假数据） */
+function axReportSig(placeId, ts){
+  var SECRET='ax_hb_v1_9f3a2c1e';
+  var raw=SECRET+'|'+String(placeId||'')+'|'+String(ts||'').slice(0,16);
+  var sum=0;
+  for(var i=0;i<raw.length;i++){
+    sum=(sum+raw.charCodeAt(i)*(i+1)*31)%1000000007;
+  }
+  return sum.toString(16);
+}
+function axSigOk(g){
+  if(!g)return false;
+  var sig=String(g.report_sig||'');
+  if(!sig)return false;
+  var expect=axReportSig(g.place_id, g.last_heartbeat);
+  if(sig===expect)return true;
+  try{
+    var t=new Date(g.last_heartbeat).getTime();
+    if(!isNaN(t)){
+      for(var d=-90;d<=90;d+=15){
+        var iso=new Date(t+d*1000).toISOString();
+        if(sig===axReportSig(g.place_id, iso))return true;
+        if(sig===axReportSig(g.place_id, iso.slice(0,19)+'Z'))return true;
+      }
+    }
+  }catch(e){}
+  return false;
+}
+function axLooksSpamGame(g){
+  if(!g)return true;
+  var pid=String(g.place_id||'');
+  if(!/^\d{5,15}$/.test(pid))return true;
+  var name=String(g.game_name||'');
+  if(/FAKE_TEST|SPAM_REPORT|malicious false|DELETE_ME/i.test(name))return true;
+  if(!name||name==='Unknown'||name==='[TITLE UNAVAILABLE]')return true;
+  var pc=Number(g.player_count);
+  var mx=Number(g.max_players);
+  /* 大服可上几千/上万，只拦负数与非法数字 */
+  if(isNaN(pc)||pc<0)return true;
+  if(!isNaN(mx)&&mx<0)return true;
+  return false;
+}
+
+function gameIsOnline(g){
+  if(!g)return false;
+  if(g.hidden===true)return false;
+  if(g.status&&g.status!=='online')return false;
+  if(!g.last_heartbeat)return false;
+  var hb=new Date(g.last_heartbeat).getTime();
+  if(isNaN(hb))return false;
+  var stale=(window.AndruxGameFilter&&window.AndruxGameFilter.STALE_MS)||45000;
+  if((Date.now()-hb)>stale)return false;
+  if(axLooksSpamGame(g))return false;
+  var pc=Number(g.player_count);
+  if(isNaN(pc)||pc<=0)return false;
+  return true;
+}
+
+/* 只查创作者是否存在，不查体验/place */
+function checkCreatorAlive(g){
+  var id=String((g&&g.creator_id)||'').trim();
+  if(!id||id==='0')return Promise.resolve(false);
+  var type=(g.creator_type==='group')?'group':'user';
+  return resolveCreatorName(id, type).then(function(name){
+    return !!(name && String(name).trim());
+  }, function(){
+    return null;
+  });
+}
+
+function checkPlaceAlive(placeId){
+  var pid=String(placeId||'');
+  if(!pid||!/^\d{5,15}$/.test(pid))return Promise.resolve(false);
+  var urls=[
+    'https://games.roproxy.com/v1/games/multiget-place-details?placeIds='+encodeURIComponent(pid),
+    'https://games.rotunnel.com/v1/games/multiget-place-details?placeIds='+encodeURIComponent(pid)
+  ];
+  function tryU(i){
+    if(i>=urls.length)return Promise.resolve(null);
+    return iconRequest(urls[i]).then(function(d){
+      if(Array.isArray(d)&&d.length>0)return d[0];
+      if(d&&d.data&&d.data.length>0)return d.data[0];
+      return false;
+    },function(){return tryU(i+1);});
+  }
+  return tryU(0);
+}
+
+function purgeDeadGames(rows){
+  if(!rows||!rows.length)return Promise.resolve([]);
+  var tasks=[];
+  var candidates=[];
+  rows.forEach(function(g){
+    if(!g)return;
+    var q=g.id?('?id=eq.'+encodeURIComponent(g.id)):('?place_id=eq.'+encodeURIComponent(g.place_id));
+    if(!gameIsOnline(g)||axLooksSpamGame(g)){
+      tasks.push(api(T_GAMES,q,{method:'DELETE',skipRate:true}).catch(function(){}));
+      return;
+    }
+    if(('report_sig' in g) && !axSigOk(g)){
+      tasks.push(api(T_GAMES,q,{method:'DELETE',skipRate:true}).catch(function(){}));
+      return;
+    }
+    candidates.push(g);
+  });
+  var aliveChecks=candidates.map(function(g){
+    var q=g.id?('?id=eq.'+encodeURIComponent(g.id)):('?place_id=eq.'+encodeURIComponent(g.place_id));
+    var studio=!!(g.is_studio===true||g.is_studio===1||g.is_studio==='true'||g.studio_test===true);
+
+    /* Studio / 未发布：只要心跳+签名过关就显示，不因「查不到体验」删除 */
+    if(studio){
+      return Promise.resolve(g);
+    }
+
+    return Promise.all([checkPlaceAlive(g.place_id), checkCreatorAlive(g)]).then(function(res){
+      var place=res[0], creator=res[1];
+      if(place===false){
+        /* 体验公开查不到：有合法模块签名 → 当作 Studio/私有测试保留 */
+        if(axSigOk(g)) return g;
+        return api(T_GAMES,q,{method:'DELETE',skipRate:true}).then(function(){return null;},function(){return null;});
+      }
+      if(creator===false && !axSigOk(g)){
+        return api(T_GAMES,q,{method:'DELETE',skipRate:true}).then(function(){return null;},function(){return null;});
+      }
+      return g;
+    });
+  });
+  return Promise.all(tasks).then(function(){
+    return Promise.all(aliveChecks);
+  }).then(function(list){
+    return (list||[]).filter(Boolean);
+  });
+}
+
 function loadGameStatus(){
 var box=$('gameStatusBox');if(!box)return;
-api(T_GAMES,'?select=*&hidden=eq.false&order=last_heartbeat.desc&limit=50').then(function(rows){
-if(!rows||!rows.length){box.innerHTML='<div class="notice">'+t('game.no_data')+'</div>';return;}
-drawGameCards(box,rows);
+api(T_GAMES,'?select=*&order=last_heartbeat.desc&limit=50',{skipRate:true}).then(function(rows){
+return purgeDeadGames(rows||[]).then(function(alive){
+if(!alive||!alive.length){box.innerHTML='<div class="notice">'+t('game.no_data')+'</div>';return;}
+drawGameCards(box,alive);
 var ids=[];
-for(var i=0;i<rows.length;i++)ids.push(rows[i].place_id);
-return Promise.all([resolveCovers(ids),resolveCreators(rows)]).then(function(res){if(res[0]||res[1])drawGameCards(box,rows);});
+for(var i=0;i<alive.length;i++)ids.push(alive[i].place_id);
+return Promise.all([resolveCovers(ids),resolveCreators(alive)]).then(function(res){if(res[0]||res[1])drawGameCards(box,alive);});
+});
 }).catch(function(err){box.innerHTML='<div class="notice">'+t('game.load_error')+'</div>';});
 }
 
 function drawGameCards(box,rows){
+rows=(rows||[]).filter(function(g){return gameIsOnline(g);});
+if(!rows.length){box.innerHTML='<div class="notice">'+t('game.no_data')+'</div>';return;}
+
 var now=Date.now();
 box.innerHTML='<div class="games-grid">'+rows.map(function(g){
 var isOnline=g.status==='online'&&(now-new Date(g.last_heartbeat).getTime())<60000;
@@ -1541,7 +1895,8 @@ var cls='gc gc-clickable'+(isOnline?'':' gc-offline')+(cover?' gc-has-bg':' gc-n
 var rawJoin=g.join_url||('roblox://placeId='+g.place_id);
 var joinHref=safeURL(rawJoin)||('roblox://placeId='+escapeAttr(g.place_id));
 var joinDisabled=isOnline?'':'pointer-events:none;opacity:0.4;';
-var statusHtml=isOnline?'<span class="gc-status gc-online">'+t('game.online')+'</span>':'<span class="gc-status gc-offline">'+t('game.offline')+'</span>';
+var isStudio=!!(g.is_studio===true||g.is_studio===1||g.is_studio==='true');
+var statusHtml=isOnline?(isStudio?'<span class="gc-status gc-online">Studio</span>':'<span class="gc-status gc-online">'+t('game.online')+'</span>'):'<span class="gc-status gc-offline">'+t('game.offline')+'</span>';
 var gd={place_id:g.place_id||'',name:g.game_name||'',desc:g.description||'',cover:cover,join:joinHref,players:g.player_count||0,max:g.max_players||0,creator:g.creator_name||'',creator_type:g.creator_type||'',creator_id:g.creator_id||'',priv:!!g.is_private_server,priv_owner:g.private_server_owner||'',priv_name:g.private_server_name||'',priv_id:g.private_server_id||'',server_name:g.server_name||'',job_id:g.job_id||'',hb:g.last_heartbeat||'',online:isOnline?1:0};
 return '<div class="'+cls+'" data-gd="'+escapeAttr(JSON.stringify(gd))+'" role="button" tabindex="0">'+
 '<div class="gc-bg">'+(cover?'<img class="gc-bg-img" alt="" data-pid="'+escapeAttr(g.place_id||'')+'" src="'+escapeAttr(cover)+'">':'')+'</div>'+
@@ -1642,34 +1997,127 @@ execSelectedPlaceId=el.dataset.placeId;
 }).catch(function(){container.innerHTML='<div class="notice bad">'+t('admin.load_fail')+'</div>';});
 }
 
+function execResolveSelfName(){
+  try{
+    var n=(localStorage.getItem('andrux_bound_roblox_name')||'').trim();
+    if(n) return n;
+    var cache=JSON.parse(localStorage.getItem('andrux_rbx_whitelist')||'[]');
+    if(Array.isArray(cache)&&cache[0]){
+      return String(cache[0].username||cache[0].name||cache[0].roblox_name||'').trim();
+    }
+  }catch(e){}
+  return '';
+}
+
+/* 解析 require(123)("Friend") / require(123).Foo("Friend") / require(123):Foo("Friend") */
+function execParseRequire(script){
+  var s=String(script||'').trim();
+  var m=s.match(/require\s*\(\s*(\d{4,})\s*\)/i);
+  if(!m) return null;
+  var assetId=m[1];
+  var rest=s.slice(m.index+m[0].length);
+  var suffix='';
+  var username='';
+  /* .Method or :Method */
+  var sm=rest.match(/^\s*([.:])\s*([A-Za-z_][\w]*)/);
+  if(sm){
+    suffix=sm[1]+sm[2];
+    rest=rest.slice(sm.index+sm[0].length);
+  }
+  /* ("name") or ('name') */
+  var um=rest.match(/^\s*\(\s*["']([^"']+)["']\s*\)/);
+  if(um){
+    username=um[1].trim();
+  } else {
+    /* also allow require(id)(name) without quotes for simple names */
+    var um2=rest.match(/^\s*\(\s*([A-Za-z0-9_]+)\s*\)/);
+    if(um2) username=um2[1].trim();
+  }
+  return {assetId:assetId,suffix:suffix,username:username};
+}
+
 function execBuildQueueEntry(script){
-  /* require(123) → 仅白名单；普通脚本同样打白名单标记，由服务端判断 */
-  var m=script.match(/require\s*\(\s*(\d{4,})\s*\)/i);
-  if(m){
-    var suffix='';
-    var sm=script.match(/\)\s*([.:])\s*([A-Za-z_][\w]*)/);
-    if(sm) suffix=sm[1]+sm[2];
-    return {type:'asset',asset_id:String(m[1]),suffix:suffix,username:'',for_whitelist:true,whitelist_only:true};
+  var parsed=execParseRequire(script);
+  if(parsed){
+    var who=parsed.username||execResolveSelfName();
+    return {
+      type:'asset',
+      asset_id:String(parsed.assetId),
+      suffix:parsed.suffix||'',
+      username:who||'',
+      for_whitelist:false,
+      whitelist_only:false
+    };
   }
   return {type:'script',script:script,for_whitelist:true,whitelist_only:true};
 }
 
+function execPushPendingForUser(username, entry){
+  if(!username) return Promise.resolve();
+  var key=username.toLowerCase();
+  return api('ax_rb','?c3=eq.'+encodeURIComponent(key)+'&select=c3,c4',{skipRate:true}).then(function(rows){
+    if(!rows||!rows.length){
+      return api('ax_rb','?c3=ilike.'+encodeURIComponent(key)+'&select=c3,c4',{skipRate:true});
+    }
+    return rows;
+  }).then(function(rows){
+    if(!rows||!rows.length) return;
+    var row=rows[0];
+    var q=row.c4;
+    if(typeof q==='string'){try{q=JSON.parse(q);}catch(e){q=[];}}
+    if(!Array.isArray(q)) q=[];
+    q.push(entry);
+    var match=row.c3||key;
+    return api('ax_rb','?c3=eq.'+encodeURIComponent(String(match).toLowerCase()),{
+      method:'PATCH',body:JSON.stringify({c4:q}),skipRate:true
+    }).catch(function(){
+      return api('ax_rb','?c3=eq.'+encodeURIComponent(String(match)),{
+        method:'PATCH',body:JSON.stringify({c4:q})
+      });
+    });
+  }).catch(function(){});
+}
+
+
+function execWithTimeout(promise, ms){
+  ms = ms || 10000;
+  return new Promise(function(resolve, reject){
+    var done = false;
+    var timer = setTimeout(function(){
+      if (done) return;
+      done = true;
+      reject(new Error('timeout'));
+    }, ms);
+    Promise.resolve(promise).then(function(v){
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      resolve(v);
+    }, function(err){
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      reject(err);
+    });
+  });
+}
+
 function execGetOnlinePlaceIds(){
-  var STALE=90*1000;
-  return api(T_GAMES,'?select=place_id,status,last_heartbeat,hidden&hidden=eq.false&order=last_heartbeat.desc&limit=200').then(function(rows){
-    var now=Date.now();
-    var ids=[];
-    var seen={};
-    (rows||[]).forEach(function(g){
-      if(!g||!g.place_id)return;
-      if(g.status&&g.status!=='online')return;
-      if(g.last_heartbeat){
-        var hb=new Date(g.last_heartbeat).getTime();
-        if(!isNaN(hb)&&(now-hb)>STALE)return;
-      }else return;
-      var pid=String(g.place_id);
-      if(seen[pid])return;
-      seen[pid]=1;
+  var STALE = 90 * 1000;
+  return api(T_GAMES, '?select=place_id,status,last_heartbeat,hidden&hidden=eq.false&order=last_heartbeat.desc&limit=200', {skipRate: true}).then(function(rows){
+    var now = Date.now();
+    var ids = [];
+    var seen = {};
+    (rows || []).forEach(function(g){
+      if (!g || !g.place_id) return;
+      if (g.status && g.status !== 'online') return;
+      if (g.last_heartbeat){
+        var hb = new Date(g.last_heartbeat).getTime();
+        if (!isNaN(hb) && (now - hb) > STALE) return;
+      } else return;
+      var pid = String(g.place_id);
+      if (seen[pid]) return;
+      seen[pid] = 1;
       ids.push(pid);
     });
     return ids;
@@ -1677,18 +2125,25 @@ function execGetOnlinePlaceIds(){
 }
 
 function execPushToPlace(placeId, entry){
-  return api(T_GAMES,'?place_id=eq.'+encodeURIComponent(placeId)+'&select=exec_queue').then(function(rows){
-    var q=(rows&&rows[0]&&rows[0].exec_queue)||[];
-    if(!Array.isArray(q))q=[];
-    q.push(entry);
-    return api(T_GAMES,'?place_id=eq.'+encodeURIComponent(placeId),{
-      method:'PATCH',body:JSON.stringify({exec_queue:q})
-    });
-  }).catch(function(){
-    return api(T_GAMES,'?place_id=eq.'+encodeURIComponent(placeId),{
-      method:'PATCH',body:JSON.stringify({exec_queue:[entry]})
-    });
-  });
+  return execWithTimeout(
+    api(T_GAMES, '?place_id=eq.' + encodeURIComponent(placeId) + '&select=exec_queue', {skipRate: true}).then(function(rows){
+      var q = (rows && rows[0] && rows[0].exec_queue) || [];
+      if (!Array.isArray(q)) q = [];
+      q.push(entry);
+      return api(T_GAMES, '?place_id=eq.' + encodeURIComponent(placeId), {
+        method: 'PATCH',
+        body: JSON.stringify({exec_queue: q}),
+        skipRate: true
+      });
+    }).catch(function(){
+      return api(T_GAMES, '?place_id=eq.' + encodeURIComponent(placeId), {
+        method: 'PATCH',
+        body: JSON.stringify({exec_queue: [entry]}),
+        skipRate: true
+      });
+    }),
+    12000
+  );
 }
 
 function execSendScript(){
@@ -1700,35 +2155,66 @@ if(!script){
   setNotice(status,t('val.enter_script'),'bad');
   return;
 }
+var parsed=execParseRequire(script);
+if(parsed && !parsed.username && !execResolveSelfName()){
+  setNotice(status,t('exec.require_syntax')||'Require 请写成：require(资产ID)("朋友用户名")','bad');
+  return;
+}
 
 var sendBtn=$('execSendBtn');
-if(sendBtn){sendBtn.disabled=true;sendBtn.textContent=t('exec.pushing');sendBtn.style.opacity='0.5';}
+function resetBtn(){
+  if(!sendBtn)return;
+  sendBtn.disabled=false;
+  sendBtn.textContent=t('exec.execute')||'执行';
+  sendBtn.style.opacity='';
+}
+if(sendBtn){
+  if(sendBtn.disabled){ /* 上次卡住时允许再次点击 */ }
+  sendBtn.disabled=true;
+  sendBtn.textContent=t('exec.pushing')||'执行中…';
+  sendBtn.style.opacity='0.5';
+}
+/* 硬超时：最多 15 秒必须恢复按钮 */
+var forceTimer=setTimeout(function(){
+  resetBtn();
+  setNotice(status,t('misc.push_fail')+(t('misc.timeout')||'超时，请重试'),'bad');
+}, 15000);
 
 var entry=execBuildQueueEntry(script);
-execGetOnlinePlaceIds().then(function(ids){
-  if(!ids.length){
+var who=entry.username||'';
+
+execWithTimeout(execGetOnlinePlaceIds(), 10000).then(function(ids){
+  var jobs=[];
+  if(ids&&ids.length){
+    ids.forEach(function(pid){jobs.push(execPushToPlace(pid, entry).catch(function(){return null;}));});
+  }
+  if(entry.type==='asset' && who){
+    jobs.push(execPushPendingForUser(who, entry).catch(function(){return null;}));
+  }
+  if(!jobs.length){
     throw new Error(t('exec.no_games')||'暂无在线服务器');
   }
-  return Promise.all(ids.map(function(pid){return execPushToPlace(pid, entry);})).then(function(){return ids;});
+  return Promise.all(jobs).then(function(){return ids||[];});
 }).then(function(ids){
-try {
-  var storedName = (window.localStorage && localStorage.getItem('andrux_bound_roblox_name')) || '';
-  rpc('ax_log_exec', {
-    p_place_id: 'broadcast',
-    p_source: 'executor_lua',
-    p_roblox_name: storedName
-  }).catch(function(){});
-  var cur = parseInt(localStorage.getItem('andrux_total_execs') || '0', 10);
-  localStorage.setItem('andrux_total_execs', String(cur + 1));
-  window.dispatchEvent(new Event('storage'));
-} catch(e) {}
-setNotice(status,(t('exec.success')||'执行成功')+' ('+ids.length+')','ok');
-toast(t('toast.script_pushed'));
+  try {
+    var storedName = who || (window.localStorage && localStorage.getItem('andrux_bound_roblox_name')) || '';
+    rpc('ax_log_exec', {
+      p_place_id: 'broadcast',
+      p_source: 'executor_lua',
+      p_roblox_name: storedName
+    }).catch(function(){});
+    var cur = parseInt(localStorage.getItem('andrux_total_execs') || '0', 10);
+    localStorage.setItem('andrux_total_execs', String(cur + 1));
+    window.dispatchEvent(new Event('storage'));
+  } catch(e) {}
+  setNotice(status,t('exec.success')||'执行成功','ok');
+  toast(t('exec.success')||'执行成功');
 }).catch(function(err){
-var em=t('misc.push_fail')+(err.message||t('misc.unknown_err'));
-setNotice(status,em,'bad');
-}).finally(function(){
-if(sendBtn){sendBtn.disabled=false;sendBtn.textContent=t('exec.execute')||'执行';sendBtn.style.opacity='';}
+  var em=t('misc.push_fail')+(err&&err.message?err.message:t('misc.unknown_err'));
+  setNotice(status,em,'bad');
+}).then(function(){
+  clearTimeout(forceTimer);
+  resetBtn();
 });
 }
 
@@ -1973,44 +2459,43 @@ location.href='../andrux-dashboard.html';
 /* ===== Global security ===== */
 function initSecurity(){
 
-/* Right-click: only allow inside community messages for context menu */
+/* Right-click: 仅社区消息允许（用于撤回菜单）；执行器输入框允许以方便粘贴 */
 document.addEventListener('contextmenu',function(e){
-if(currentPage==='community'&&e.target.closest&&e.target.closest('.message'))return;
-e.preventDefault();
-e.stopPropagation();
+  var t=e.target;
+  if(currentPage==='community'&&t.closest&&t.closest('.message'))return;
+  if(t.closest&&(t.closest('#execScriptInput')||t.closest('textarea')||t.closest('input')))return;
+  e.preventDefault();
+  e.stopPropagation();
 },true);
 
-/* Keyboard shortcuts */
+/* 拦截常见「查看元素 / 开发者工具 / 查看源码」快捷键（静默） */
 document.addEventListener('keydown',function(e){
-var key=String(e.key||'').toLowerCase();
-var blocked=false;
-/* F12 */
-if(key==='f12')blocked=true;
-/* Alt+F4 */
-if(e.altKey&&key==='f4')blocked=true;
-/* Ctrl+S / Ctrl+U / Ctrl+P */
-if(e.ctrlKey&&!e.shiftKey&&!e.altKey&&['s','u','p'].indexOf(key)>=0)blocked=true;
-/* Ctrl+Shift+I / J / C / M (devtools) */
-if(e.ctrlKey&&e.shiftKey&&!e.altKey&&['i','j','c','m'].indexOf(key)>=0)blocked=true;
-/* Ctrl+Shift+F (global search) */
-if(e.ctrlKey&&e.shiftKey&&key==='f')blocked=true;
-/* Ctrl+Shift+K (console) */
-if(e.ctrlKey&&e.shiftKey&&key==='k')blocked=true;
-/* Ctrl+G */
-if(e.ctrlKey&&!e.shiftKey&&key==='g')blocked=true;
-/* Ctrl+Shift (alone, prevents some inspectors) */
-if(e.ctrlKey&&e.shiftKey&&['shift','control'].indexOf(key)>=0)blocked=true;
-/* F5 only allow refresh, block others like F7 (caret browsing) */
-if(key==='f7')blocked=true;
-/* PrintScreen */
-if(e.key==='PrintScreen')blocked=true;
-/* Ctrl+= / Ctrl+- (zoom inspect) */
-if(e.ctrlKey&&['=','-','0'].indexOf(key)>=0&&!e.shiftKey)blocked=true;
-if(blocked){
-e.preventDefault();
-e.stopPropagation();
-if(key!=='PrintScreen')toast(t('toast.key_blocked'));
-}
+  var key=String(e.key||'').toLowerCase();
+  var code=String(e.code||'');
+  var ctrl=!!(e.ctrlKey||e.metaKey);
+  var shift=!!e.shiftKey;
+  var alt=!!e.altKey;
+  var blocked=false;
+  if(key==='f12'||code==='F12')blocked=true;
+  if(alt&&key==='f4')blocked=true;
+  /* Ctrl/Cmd+U 查看源码；S 保存；P 打印 */
+  if(ctrl&&!shift&&!alt&&['s','u','p'].indexOf(key)>=0)blocked=true;
+  /* Ctrl/Cmd+Shift+I/J/C/K/M/E 开发者工具 */
+  if(ctrl&&shift&&!alt&&['i','j','c','k','m','e'].indexOf(key)>=0)blocked=true;
+  if(ctrl&&shift&&key==='f')blocked=true;
+  if(ctrl&&!shift&&key==='g')blocked=true;
+  /* Mac: Cmd+Option+I/J/C */
+  if(e.metaKey&&alt&&['i','j','c'].indexOf(key)>=0)blocked=true;
+  if(key==='f7')blocked=true;
+  if(e.key==='PrintScreen'||code==='PrintScreen')blocked=true;
+  if(ctrl&&!shift&&['=','-','0'].indexOf(key)>=0)blocked=true;
+  /* Ctrl+Shift+Del 清除数据面板 */
+  if(ctrl&&shift&&(key==='delete'||key==='backspace'))blocked=true;
+  if(blocked){
+    e.preventDefault();
+    e.stopPropagation();
+    try{e.stopImmediatePropagation();}catch(err){}
+  }
 },true);
 
 /* PrintScreen keyup also block */
@@ -2018,22 +2503,38 @@ document.addEventListener('keyup',function(e){
 if(e.key==='PrintScreen'){e.preventDefault();}
 },true);
 
-/* Copy: only allow via community context menu */
-document.addEventListener('copy',function(e){
-if(!e.target.closest||!e.target.closest('.message')){
-e.preventDefault();
-toast(t('toast.copy_blocked'));
+/* Copy: 社区消息 + 执行器脚本区 + 输入框允许复制 */
+function allowCopySelect(el){
+  if(!el||!el.closest)return false;
+  return !!(el.closest('.message')
+    || el.closest('#execScriptInput')
+    || el.closest('#execLuaPanel')
+    || el.closest('.luau-hl')
+    || el.closest('.luau-hl-textarea')
+    || el.closest('.exec-editor')
+    || el.closest('textarea')
+    || el.closest('input')
+    || el.closest('[contenteditable="true"]')
+    || el.closest('.selectable')
+    || el.closest('.gc-join'));
 }
-});
+document.addEventListener('copy',function(e){
+  if(allowCopySelect(e.target)) return;
+  e.preventDefault();
+  /* 静默，不提示 */
+}, true);
 
 /* Drag prevention */
-document.addEventListener('dragstart',function(e){e.preventDefault();});
+document.addEventListener('dragstart',function(e){
+  if(allowCopySelect(e.target)) return;
+  e.preventDefault();
+});
 document.addEventListener('drop',function(e){e.preventDefault();});
 
-/* Disable text selection globally (except .selectable and .gc-join elements) */
+/* 全局禁止选中，但执行器/输入框/可选消息除外 */
 document.addEventListener('selectstart',function(e){
-if(e.target.closest&&e.target.closest('.selectable,.gc-join'))return;
-e.preventDefault();
+  if(allowCopySelect(e.target)) return;
+  e.preventDefault();
 },true);
 }
 

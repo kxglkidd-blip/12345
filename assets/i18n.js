@@ -105,7 +105,23 @@ if(m.indexOf('AbortError')!==-1||m.indexOf('aborted')!==-1||m.indexOf('ERR_ABORT
    Andrux i18n Engine — Chinese / English
    ============================================================ */
 window.I18N = {
-  lang: localStorage.getItem('andrux_lang') || 'zh',
+  /* 首次访问按浏览器语言；设置里改过会写入 andrux_lang，之后以玩家选择为准 */
+  lang: (function(){
+    try {
+      var saved = localStorage.getItem('andrux_lang');
+      if (saved === 'zh' || saved === 'en') return saved;
+    } catch (e) {}
+    var nav = '';
+    try {
+      nav = (navigator.languages && navigator.languages[0]) || navigator.language || navigator.userLanguage || '';
+    } catch (e) {}
+    nav = String(nav || '').toLowerCase();
+    if (nav.indexOf('zh') === 0) return 'zh';
+    if (nav.indexOf('en') === 0) return 'en';
+    /* 其它语言默认英文；含 zh-CN / zh-TW 已在上面 */
+    if (/^zh[-_]/.test(nav)) return 'zh';
+    return 'en';
+  })(),
 
   dict: {
     zh: {
@@ -388,6 +404,8 @@ window.I18N = {
       'admin.ip_unban_btn': '解封IP',
       'admin.game_mgmt': '游戏管理',
       'admin.show_hidden': '显示已隐藏',
+      'admin.confirm_delete_game': '确定删除该游戏上报？',
+      'toast.game_deleted': '已删除游戏',
       'admin.hide_game': '隐藏游戏',
       'admin.restore_game': '恢复显示',
       'admin.hub_mgmt': '脚本中心卡片',
@@ -454,6 +472,10 @@ window.I18N = {
       'exec.script_executor': '脚本执行器',
       'exec.char_count': '0 字符',
       'exec.placeholder': '在此输入 Lua 脚本...',
+      'exec.target_user': '目标玩家',
+      'exec.target_user_ph': 'require(资产ID)("朋友用户名")',
+      'exec.need_target': '请填写目标 Roblox 用户名',
+      'exec.require_syntax': 'Require 请写成：require(资产ID)("朋友用户名")',
       'exec.execute': '执行',
       'exec.pushing': '执行中...',
       'exec.success': '执行成功',
@@ -502,6 +524,11 @@ window.I18N = {
       'set.language': '语言',
       'set.language_desc': '切换界面语言，所有文字和提示会立即生效。',
       'set.game_filter': '游戏',
+      'set.logo': 'LOGO',
+      'set.show_logo': '显示 LOGO',
+      'set.logo_on': '已开启 LOGO',
+      'set.logo_off': '已关闭 LOGO',
+      'set.show_logo_desc': '仅对白名单玩家生效。开启后进服显示 LOGO；关闭则不显示。不影响执行与上报。',
       'set.hide_offline': '不显示不在线游戏',
       'set.hide_offline_desc': '开启后游戏页面只显示在线游戏，不在线的游戏会被隐藏。如果隐藏的游戏上线会自动显示，在线的游戏下线会自动隐藏。',
 
@@ -1054,6 +1081,10 @@ window.I18N = {
       'exec.script_executor': 'Script Executor',
       'exec.char_count': '0 chars',
       'exec.placeholder': 'Type Lua script here...',
+      'exec.target_user': 'Target player',
+      'exec.target_user_ph': 'Roblox username (require goes to them; empty = yourself)',
+      'exec.need_target': 'Enter target Roblox username',
+      'exec.require_syntax': 'Write require as: require(assetId)("FriendName")',
       'exec.execute': 'Execute',
       'exec.pushing': 'Executing...',
       'exec.success': 'Executed successfully',
@@ -1102,6 +1133,11 @@ window.I18N = {
       'set.language': 'Language',
       'set.language_desc': 'Switch interface language. All text and prompts update instantly.',
       'set.game_filter': 'Games',
+      'set.logo': 'LOGO',
+      'set.show_logo': 'Show LOGO',
+      'set.logo_on': 'LOGO enabled',
+      'set.logo_off': 'LOGO disabled',
+      'set.show_logo_desc': 'Whitelist players only. When on, LOGO shows in-game; when off, LOGO is hidden. Does not affect execution or reporting.',
       'set.hide_offline': 'Hide offline games',
       'set.hide_offline_desc': 'When enabled, the game page only shows online games. Offline games are hidden. If a hidden game comes online, it appears automatically. If an online game goes offline, it is hidden.',
 
