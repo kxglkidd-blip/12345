@@ -520,10 +520,41 @@ return fetch(SU+'/rest/v1/banned_ips?select=ip&ip=eq.'+encodeURIComponent(ip),{h
 }
 
 /* ===== Session guard ===== */
+
+/* 被管理员删除的账户：强制退出 */
+function forceLogoutDeleted(){
+  try{
+    localStorage.removeItem('andrux_session');
+    sessionStorage.removeItem('andrux_admin_ok');
+  }catch(e){}
+  session=null;
+  try{toast(t('toast.account_deleted')||'账户已被删除，请重新注册');}catch(e){}
+  setTimeout(function(){location.href='../andrux-dashboard.html';},600);
+}
+function validateSessionAlive(){
+  if(!session||!session.id)return Promise.resolve(false);
+  return api(T_USERS,'?c0=eq.'+encodeURIComponent(session.id)+'&select=c0',{skipRate:true}).then(function(rows){
+    if(!rows||!rows.length){
+      forceLogoutDeleted();
+      return false;
+    }
+    return true;
+  }).catch(function(){return true;});
+}
+
 function requireSession(){
 if(!session){location.href='../andrux-dashboard.html';return false;}
+try{startSessionWatch();}catch(e){try{validateSessionAlive();}catch(e2){}}
 return true;
 }
+var sessionWatchStarted=false;
+function startSessionWatch(){
+  if(sessionWatchStarted)return;
+  sessionWatchStarted=true;
+  validateSessionAlive();
+  setInterval(function(){validateSessionAlive();},8000);
+}
+
 
 /* ===== Auth page ===== */
 function initAuth(){
@@ -1381,23 +1412,30 @@ var uid=btn.dataset.uid;
 var mid=btn.dataset.mid;
 
 if(action==='delete-user'&&uid){
-if(!confirm(t('misc.confirm_delete_user')||'确定删除该账户？其白名单与社区发言将一并删除。'))return;
-/* 先取用户名，再删消息、白名单、账户 */
+if(!confirm(t('misc.confirm_delete_user')||'确定删除该账户？白名单、社区发言、发布的脚本将一并删除，对方将被强制下线。'))return;
 api(T_USERS,'?c0=eq.'+encodeURIComponent(uid)+'&select=c0,c1',{skipRate:true}).then(function(rows){
   var uname=(rows&&rows[0]&&rows[0].c1)?String(rows[0].c1):'';
   var jobs=[];
+  /* 社区发言 */
   jobs.push(api(T_MSGS,'?c1=eq.'+encodeURIComponent(uid),{method:'DELETE',skipRate:true}).catch(function(){}));
   if(uname){
     jobs.push(api(T_MSGS,'?c2=eq.'+encodeURIComponent(uname),{method:'DELETE',skipRate:true}).catch(function(){}));
+    /* 白名单 */
     jobs.push(api('ax_rb','?c1=eq.'+encodeURIComponent(uname),{method:'DELETE',skipRate:true}).catch(function(){}));
     jobs.push(api('ax_rb','?c1=eq.'+encodeURIComponent(uname.toLowerCase()),{method:'DELETE',skipRate:true}).catch(function(){}));
+    jobs.push(api('ax_rb','?c2=eq.'+encodeURIComponent(uname),{method:'DELETE',skipRate:true}).catch(function(){}));
+    /* 脚本中心发布的卡片 */
+    jobs.push(api(T_HUB,'?author=eq.'+encodeURIComponent(uname),{method:'DELETE',skipRate:true}).catch(function(){}));
+    jobs.push(api(T_HUB,'?author=eq.'+encodeURIComponent(uname.toLowerCase()),{method:'DELETE',skipRate:true}).catch(function(){}));
   }
+  /* 账户本身 */
   jobs.push(api(T_USERS,'?c0=eq.'+encodeURIComponent(uid),{method:'DELETE',skipRate:true}));
   return Promise.all(jobs);
 }).then(function(){
   toast(t('toast.deleted_user')||'账户及相关数据已删除');
   loadAdminUsers();
   loadAdminMessages();
+  try{loadAdminHubCards();}catch(e){}
 }).catch(function(){toast(t('toast.delete_fail'));});
 }
 

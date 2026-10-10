@@ -553,6 +553,7 @@ window.I18N = {
       'toast.mute_on': '已设置全员禁言',
       'toast.mute_off': '已关闭全员禁言',
       'toast.op_fail': '操作失败',
+      'toast.account_deleted': '账户已被删除，请重新注册',
       'toast.deleted_user': '已删除',
       'toast.delete_fail': '删除失败',
       'toast.muted': '已禁言',
