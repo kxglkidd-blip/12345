@@ -94,14 +94,17 @@ function detectVM(){
     }
   }catch(e){}
 
-  /* 2. Screen resolution anomalies */
+  /* 2. Screen resolution anomalies (skip phone/tablet — false positives) */
+  var isTouch=('ontouchstart' in window)||(navigator.maxTouchPoints>0);
   var w=screen.width;
   var h=screen.height;
   var dpr=window.devicePixelRatio||1;
-  var knownVMRes=[[1024,768],[800,600],[1280,800],[1152,864]];
-  knownVMRes.forEach(function(r){if(w===r[0]&&h===r[1]){score+=15;flags.push('vm_res');}});
-  if(w<1024||h<768){score+=10;flags.push('small_screen');}
-  if(dpr===1&&(w>=1920||h>=1080)){score+=5;flags.push('low_dpr');}
+  if(!isTouch){
+    var knownVMRes=[[1024,768],[800,600],[1280,800],[1152,864]];
+    knownVMRes.forEach(function(r){if(w===r[0]&&h===r[1]){score+=15;flags.push('vm_res');}});
+    if(w<1024||h<768){score+=10;flags.push('small_screen');}
+    if(dpr===1&&(w>=1920||h>=1080)){score+=5;flags.push('low_dpr');}
+  }
 
   /* 3. Navigator anomalies */
   var ua=navigator.userAgent||'';
@@ -173,6 +176,12 @@ function trackMouse(){
 
 /* Anti-debug / anti-inspect — deter casual element & app inspection */
 function antiDebug(){
+  /* 移动端/触屏：不做尺寸与 debugger 强拦截，避免分屏、浏览器工具栏误判黑屏 */
+  var isTouch=('ontouchstart' in window)||(navigator.maxTouchPoints>0);
+  var isNarrow=Math.min(screen.width||0,screen.height||0)<700;
+  if(isTouch||isNarrow){
+    return;
+  }
   var _dtHits=0;
   function veilOn(){
     try{
@@ -199,10 +208,9 @@ function antiDebug(){
     try{
       if(SEC.vmFlags.indexOf(flag)<0)SEC.vmFlags.push(flag);
       _dtHits++;
-      /* continuous console wipe */
       try{console.clear();}catch(e){}
-      try{console.log=console.info=console.warn=console.error=console.debug=function(){};}catch(e){}
-      if(_dtHits>=2){
+      /* 仅记录，桌面端连续命中才遮罩（阈值提高） */
+      if(_dtHits>=4){
         veilOn();
         try{
           getIP().then(function(ip){
@@ -219,25 +227,25 @@ function antiDebug(){
     }catch(e){}
   }
 
-  /* 1. debugger timing */
+  /* 1. debugger timing — 阈值放宽 */
   (function check(){
     var start=performance.now();
     /* eslint-disable no-debugger */
     debugger;
     var end=performance.now();
-    if(end-start>120){onSuspect('debugger_open');}
-    setTimeout(check,3000);
+    if(end-start>250){onSuspect('debugger_open');}
+    setTimeout(check,6000);
   })();
 
-  /* 2. Performance baseline — VMs are slower */
+  /* 2. Performance baseline */
   var t0=performance.now();
   for(var i=0;i<1000000;i++){}
   var t1=performance.now();
   SEC.perfBaseline=t1-t0;
-  if(SEC.perfBaseline>80){SEC.vmFlags.push('slow_js');}
+  if(SEC.perfBaseline>150){SEC.vmFlags.push('slow_js');}
 
-  /* 3. Docked DevTools size gap (desktop) */
-  var threshold=180;
+  /* 3. Docked DevTools size gap — 仅桌面 */
+  var threshold=220;
   (function checkSize(){
     try{
       var w=window.outerWidth-window.innerWidth;
@@ -245,28 +253,16 @@ function antiDebug(){
       if(w>threshold||h>threshold){onSuspect('devtools_size');}
       else if(_dtHits>0 && w<=threshold && h<=threshold){veilOff();_dtHits=Math.max(0,_dtHits-1);}
     }catch(e){}
-    setTimeout(checkSize,2000);
+    setTimeout(checkSize,3000);
   })();
 
-  /* 4. console open probe (toString trap) */
+  /* 4. console open probe — 降低频率 */
   (function consoleProbe(){
     var el=new Image();
-    var probed=false;
-    Object.defineProperty(el,'id',{get:function(){probed=true;onSuspect('console_probe');}});
+    Object.defineProperty(el,'id',{get:function(){onSuspect('console_probe');}});
     try{console.log('%c',el);}catch(e){}
-    try{console.clear();}catch(e){}
-    setTimeout(consoleProbe,4000);
+    setTimeout(consoleProbe,8000);
   })();
-
-  /* 5. periodic console clear */
-  setInterval(function(){try{console.clear();}catch(e){}},1500);
-
-  /* 6. block common inspection globals from casual use */
-  try{
-    ['__REACT_DEVTOOLS_GLOBAL_HOOK__','__VUE_DEVTOOLS_GLOBAL_HOOK__'].forEach(function(k){
-      try{Object.defineProperty(window,k,{get:function(){onSuspect('devtools_hook');return undefined;},set:function(){}});}catch(e){}
-    });
-  }catch(e){}
 }
 
 /* Honey trap: hidden bait element only — no DOM API hijacking */
@@ -281,7 +277,7 @@ function honeyTrap(){
 /* Handle risk score — silent reporting only, no forced logout to avoid false positives */
 function handleRisk(){
   var score=SEC.vmScore;
-  if(score>=40){
+  if(score>=70){
     /* Report to backend for admin review only */
     getIP().then(function(ip){
       rpcCall('record_suspicious',{
@@ -464,6 +460,7 @@ try{session=JSON.parse(localStorage.getItem('andrux_session')||'null');}catch(e)
 
 /* ===== Supabase API (obfuscated table/field names) ===== */
 function api(table,query,options){
+if(typeof navigator!=='undefined'&&navigator.onLine===false){return Promise.reject(new Error(t('toast.offline')||'当前无网络连接'));}
 options=options||{};
 if(!options.skipRate&&!rateCheck()){
 toast(t('toast.rated'));
@@ -548,13 +545,6 @@ try{startSessionWatch();}catch(e){try{validateSessionAlive();}catch(e2){}}
 return true;
 }
 var sessionWatchStarted=false;
-function startSessionWatch(){
-  if(sessionWatchStarted)return;
-  sessionWatchStarted=true;
-  validateSessionAlive();
-  setInterval(function(){validateSessionAlive();},8000);
-}
-
 
 /* ===== Auth page ===== */
 function initAuth(){
@@ -1996,12 +1986,58 @@ if(refreshBtn)refreshBtn.addEventListener('click',loadExecGames);
 
 var editor=$('execScriptInput');
 var charCount=$('execCharCount');
-if(editor&&charCount){
-editor.addEventListener('input',function(){charCount.textContent=editor.value.length+t('exec.char_unit');});
+var EXEC_SCRIPT_KEY='andrux_exec_script_draft';
+function execSyncCharCount(){
+  if(editor&&charCount){
+    charCount.textContent=(editor.value||'').length+t('exec.char_unit');
+  }
+}
+function execSaveDraft(){
+  try{
+    if(editor) localStorage.setItem(EXEC_SCRIPT_KEY, editor.value||'');
+  }catch(e){}
+}
+function execRestoreDraft(){
+  try{
+    var draft=localStorage.getItem(EXEC_SCRIPT_KEY);
+    if(draft!=null&&editor&&!editor.value){
+      editor.value=draft;
+    }else if(draft!=null&&editor&&editor.value!==draft){
+      /* 优先恢复草稿（离开页面再回来） */
+      editor.value=draft;
+    }
+  }catch(e){}
+  execSyncCharCount();
+  /* 通知语法高亮等同步 */
+  try{
+    if(editor){
+      editor.dispatchEvent(new Event('input',{bubbles:true}));
+    }
+  }catch(e){}
+}
+if(editor){
+  execRestoreDraft();
+  editor.addEventListener('input',function(){
+    execSyncCharCount();
+    execSaveDraft();
+  });
+  /* 失焦、页面隐藏也保存 */
+  editor.addEventListener('blur',execSaveDraft);
+  document.addEventListener('visibilitychange',function(){
+    if(document.visibilityState==='hidden') execSaveDraft();
+  });
+  window.addEventListener('pagehide',execSaveDraft);
 }
 
 var clearBtn=$('execClearBtn');
-if(clearBtn)clearBtn.addEventListener('click',function(){if(editor){editor.value='';if(charCount)charCount.textContent='0'+t('exec.char_unit');}});
+if(clearBtn)clearBtn.addEventListener('click',function(){
+  if(editor){
+    editor.value='';
+    execSyncCharCount();
+    try{localStorage.removeItem(EXEC_SCRIPT_KEY);}catch(e){}
+    try{editor.dispatchEvent(new Event('input',{bubbles:true}));}catch(e){}
+  }
+});
 
 var sendBtn=$('execSendBtn');
 if(sendBtn)sendBtn.addEventListener('click',execSendScript);
@@ -2480,18 +2516,11 @@ toast(t('profile.save_fail')+' ('+t('profile.need_sql')+')');
 /* ===== Session watchdog: kick deleted accounts ===== */
 function startSessionWatch(){
 if(!session)return;
-watchTimer=setInterval(function(){
-api(T_USERS,'?c0=eq.'+encodeURIComponent(session.id)+'&select=c0').then(function(rows){
-if(!rows||!rows.length){
-localStorage.removeItem('andrux_session');
-session=null;
-clearInterval(poller);
-if(gameTimer){clearInterval(gameTimer);gameTimer=null;}
-if(watchTimer){clearInterval(watchTimer);watchTimer=null;}
-location.href='../andrux-dashboard.html';
-}
-}).catch(function(){});
-},12000);
+if(sessionWatchStarted)return;
+sessionWatchStarted=true;
+validateSessionAlive();
+if(watchTimer){try{clearInterval(watchTimer);}catch(e){}}
+watchTimer=setInterval(function(){validateSessionAlive();},8000);
 }
 
 /* ===== Global security ===== */
@@ -2574,6 +2603,43 @@ document.addEventListener('selectstart',function(e){
   if(allowCopySelect(e.target)) return;
   e.preventDefault();
 },true);
+}
+
+/* ===== Network status ===== */
+function initNetworkWatch(){
+  var offlineBannerId='__ax_offline_banner';
+  function showOfflineBanner(){
+    var el=document.getElementById(offlineBannerId);
+    if(!el){
+      el=document.createElement('div');
+      el.id=offlineBannerId;
+      el.setAttribute('style','position:fixed;left:0;right:0;top:0;z-index:2147483000;padding:10px 16px;text-align:center;font:600 13px/1.4 system-ui,sans-serif;background:#8a2d2d;color:#fffaf1;box-shadow:0 4px 20px rgba(0,0,0,0.2);');
+      document.body.appendChild(el);
+    }
+    el.textContent=t('toast.offline')||'当前无网络连接，请检查网络后重试';
+    el.style.display='block';
+  }
+  function hideOfflineBanner(){
+    var el=document.getElementById(offlineBannerId);
+    if(el) el.style.display='none';
+  }
+  function onOffline(){
+    showOfflineBanner();
+    try{toast(t('toast.offline')||'当前无网络连接，请检查网络后重试');}catch(e){}
+  }
+  function onOnline(){
+    hideOfflineBanner();
+    try{toast(t('toast.online')||'网络已恢复');}catch(e){}
+  }
+  window.addEventListener('offline',onOffline);
+  window.addEventListener('online',onOnline);
+  if(typeof navigator!=='undefined'&&navigator.onLine===false){
+    onOffline();
+  }
+  /* 暴露给 api 层 */
+  window.__axIsOnline=function(){
+    return typeof navigator==='undefined'||navigator.onLine!==false;
+  };
 }
 
 /* ===== Boot ===== */

@@ -431,3 +431,19 @@ body.reduce-motion *,body.reduce-motion *::before,body.reduce-motion *::after{
   user-select:text!important;
   -webkit-user-select:text!important;
 }
+
+
+.dash-metric-value{font-variant-numeric:tabular-nums;font-feature-settings:"tnum";transition:transform .25s ease,color .25s ease;}
+.dash-metric-value.metric-ticking{color:var(--accent);}
+.dash-metric-value.metric-pop{animation:metricPop .32s ease;}
+@keyframes metricPop{0%{transform:scale(1);}40%{transform:scale(1.08);}100%{transform:scale(1);}}
+
+.primary-btn:disabled,
+.primary-btn.is-disabled,
+button.primary-btn:disabled{
+  opacity:0.45!important;
+  filter:grayscale(0.35);
+  cursor:not-allowed!important;
+  pointer-events:none!important;
+  box-shadow:none!important;
+}

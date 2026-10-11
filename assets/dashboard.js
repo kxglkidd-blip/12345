@@ -273,13 +273,50 @@ function loadWhitelistBindings(){
 }
 
 /* ===== Render metrics ===== */
+/* 数字滚动动画：从当前值滚到目标值 */
+var _metricAnim={};
+function animateMetric(el, target, key){
+  if(!el)return;
+  target=Math.max(0, Math.floor(Number(target)||0));
+  var raw=String(el.textContent||'').replace(/[^0-9]/g,'');
+  var from=_metricAnim[key]!=null?_metricAnim[key]:(parseInt(raw,10)||0);
+  if(isNaN(from))from=0;
+  if(from===target){
+    el.textContent=fmtNum(target);
+    _metricAnim[key]=target;
+    return;
+  }
+  if(_metricAnim[key+'_raf']){
+    try{cancelAnimationFrame(_metricAnim[key+'_raf']);}catch(e){}
+  }
+  var start=performance.now();
+  var diff=Math.abs(target-from);
+  var dur=Math.min(1200, Math.max(450, 280+diff*8));
+  function easeOutCubic(t){return 1-Math.pow(1-t,3);}
+  function tick(now){
+    var p=Math.min(1,(now-start)/dur);
+    var cur=Math.round(from+(target-from)*easeOutCubic(p));
+    el.textContent=fmtNum(cur);
+    el.classList.add('metric-ticking');
+    if(p<1){
+      _metricAnim[key+'_raf']=requestAnimationFrame(tick);
+    }else{
+      _metricAnim[key]=target;
+      el.textContent=fmtNum(target);
+      el.classList.remove('metric-ticking');
+      el.classList.add('metric-pop');
+      setTimeout(function(){el.classList.remove('metric-pop');},320);
+    }
+  }
+  _metricAnim[key+'_raf']=requestAnimationFrame(tick);
+}
 function renderMetrics(){
   var gEl=$('metricGames');
   var pEl=$('metricPlayers');
   var eEl=$('metricExecs');
-  if(gEl)gEl.textContent=fmtNum(onlineGames.length);
-  if(pEl)pEl.textContent=fmtNum(totalPlayers);
-  if(eEl)eEl.textContent=fmtNum(execCount);
+  animateMetric(gEl, onlineGames.length, 'games');
+  animateMetric(pEl, totalPlayers, 'players');
+  animateMetric(eEl, execCount, 'execs');
 }
 
 /* ===== Render launch area info ===== */
@@ -491,12 +528,14 @@ function applyI18n(){
 }
 
 /* ===== Init ===== */
+var _dashBooted=false;
 function init(){
-  if(!$('metricGames'))return; // Not on dashboard page
+  if(!$('metricGames'))return;
+  if(_dashBooted)return;
+  _dashBooted=true;
 
   applyI18n();
 
-  // Bind buttons
   var launchBtn=$('dashLaunchBtn');
   if(launchBtn&&!launchBtn._bound){
     launchBtn._bound=true;
@@ -515,21 +554,19 @@ function init(){
     });
   }
 
-  // Load data
   prefillBoundUser();
   refreshAll();
 
-  // Periodic refresh every 15 seconds
   if(!window._dashInterval){
-    window._dashInterval=setInterval(refreshAll,15000);
+    window._dashInterval=setInterval(refreshAll,10000);
   }
 }
 
 if(document.readyState==='loading'){
   document.addEventListener('DOMContentLoaded',init);
 }else{init();}
-setTimeout(init,500);
-setTimeout(init,2000);
+/* 兜底：元素晚出现时再试一次 */
+setTimeout(function(){if(!$('metricGames')||_dashBooted)return;init();},800);
 
 // Same-tab live update when a script is pushed
 window.addEventListener('andrux_exec_logged',function(e){
@@ -551,9 +588,10 @@ window.addEventListener('storage',function(e){
 
 // MutationObserver for late-loaded content
 var _obs=new MutationObserver(function(){
-  if($('metricGames')){init();_obs.disconnect();}
+  if($('metricGames')&&!_dashBooted){init();}
+  if(_dashBooted){try{_obs.disconnect();}catch(e){}}
 });
-_obs.observe(document.body,{childList:true,subtree:true});
+try{_obs.observe(document.body,{childList:true,subtree:true});}catch(e){}
 
 // Expose API
 window.Dashboard={

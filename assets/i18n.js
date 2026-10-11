@@ -535,6 +535,8 @@ window.I18N = {
       /* ===== Toast / Dynamic messages ===== */
       'toast.key_blocked': '该快捷键已被页面拦截。',
       'toast.copy_blocked': '复制只允许通过社区消息右键菜单。',
+      'toast.offline': '当前无网络连接，请检查网络后重试。',
+      'toast.online': '网络已恢复。',
       'toast.rated': '请求过于频繁，请稍后。',
       'toast.sent': '已发送',
       'toast.recalled': '已撤回。',
@@ -1145,6 +1147,8 @@ window.I18N = {
       /* ===== Toast / Dynamic messages ===== */
       'toast.key_blocked': 'This shortcut is blocked by the page.',
       'toast.copy_blocked': 'Copy is only allowed via community message right-click menu.',
+      'toast.offline': 'No network connection. Please check your internet and try again.',
+      'toast.online': 'Back online.',
       'toast.rated': 'Too many requests, please wait.',
       'toast.sent': 'Sent',
       'toast.recalled': 'Recalled.',
