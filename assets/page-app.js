@@ -1960,82 +1960,462 @@ var execSelectedPlaceId=null;
 
 function initExecutor(){
 if(!requireSession())return;
-var lock=$('execLock');
 var panel=$('execPanel');
-var form=$('execLoginForm');
-if(!lock||!panel||!form)return;
-
-if(sessionStorage.getItem('andrux_admin_ok')==='1'){
-lock.classList.add('hidden');panel.classList.remove('hidden');
-}
-
-form.addEventListener('submit',function(e){
-e.preventDefault();
-var pw=($('execPassword')||{}).value||'';
-hashText(pw.toLowerCase()).then(function(hash){
-if(hash===getAdminHash()){
-sessionStorage.setItem('andrux_admin_ok','1');
-lock.classList.add('hidden');panel.classList.remove('hidden');
-toast(t('toast.password_ok'));
-}else{setNotice($('execNotice'),t('toast.password_err'),'bad');}
-});
-});
+if(panel) panel.classList.remove('hidden');
 
 var refreshBtn=$('execRefreshGames');
 if(refreshBtn)refreshBtn.addEventListener('click',loadExecGames);
 
 var editor=$('execScriptInput');
 var charCount=$('execCharCount');
-var EXEC_SCRIPT_KEY='andrux_exec_script_draft';
+var EXEC_TABS_KEY='andrux_exec_tabs_v1';
+var EXEC_SCRIPT_KEY='andrux_exec_script_draft'; /* 兼容旧草稿 */
+var execTabs={items:[{id:'t1',name:'脚本 1',content:''}],active:'t1'};
+var execTabSeq=2;
+
 function execSyncCharCount(){
   if(editor&&charCount){
-    charCount.textContent=(editor.value||'').length+t('exec.char_unit');
+    charCount.textContent=(editor.value||'').length+(t('exec.char_unit')||' 字符');
   }
 }
-function execSaveDraft(){
-  try{
-    if(editor) localStorage.setItem(EXEC_SCRIPT_KEY, editor.value||'');
-  }catch(e){}
+function execNotifyEditor(){
+  try{ if(editor) editor.dispatchEvent(new Event('input',{bubbles:true})); }catch(e){}
 }
-function execRestoreDraft(){
+function execLoadTabs(){
   try{
-    var draft=localStorage.getItem(EXEC_SCRIPT_KEY);
-    if(draft!=null&&editor&&!editor.value){
-      editor.value=draft;
-    }else if(draft!=null&&editor&&editor.value!==draft){
-      /* 优先恢复草稿（离开页面再回来） */
-      editor.value=draft;
+    var raw=localStorage.getItem(EXEC_TABS_KEY);
+    if(raw){
+      var data=JSON.parse(raw);
+      if(data&&Array.isArray(data.items)&&data.items.length){
+        execTabs.items=data.items;
+        execTabs.active=data.active||data.items[0].id;
+        var maxN=1;
+        data.items.forEach(function(it){
+          var m=String(it.id||'').match(/(\d+)/);
+          if(m) maxN=Math.max(maxN, parseInt(m[1],10)||1);
+        });
+        execTabSeq=maxN+1;
+        return;
+      }
+    }
+    /* 迁移旧单草稿 */
+    var legacy=localStorage.getItem(EXEC_SCRIPT_KEY);
+    if(legacy!=null){
+      execTabs.items=[{id:'t1',name:'脚本 1',content:String(legacy)}];
+      execTabs.active='t1';
     }
   }catch(e){}
+}
+function execPersistTabs(){
+  try{
+    localStorage.setItem(EXEC_TABS_KEY, JSON.stringify(execTabs));
+  }catch(e){}
+}
+function execGetActiveTab(){
+  for(var i=0;i<execTabs.items.length;i++){
+    if(execTabs.items[i].id===execTabs.active) return execTabs.items[i];
+  }
+  return execTabs.items[0]||null;
+}
+function execSaveCurrentToTab(){
+  if(!editor) return;
+  var tab=execGetActiveTab();
+  if(tab) tab.content=editor.value||'';
+  execPersistTabs();
+}
+function execApplyActiveToEditor(){
+  if(!editor) return;
+  var tab=execGetActiveTab();
+  editor.value=tab? (tab.content||'') : '';
   execSyncCharCount();
-  /* 通知语法高亮等同步 */
-  try{
-    if(editor){
-      editor.dispatchEvent(new Event('input',{bubbles:true}));
-    }
-  }catch(e){}
+  execNotifyEditor();
 }
+function execRenderTabs(){
+  var list=$('execTabsList');
+  if(!list) return;
+  list.innerHTML='';
+  execTabs.items.forEach(function(tab){
+    var btn=document.createElement('button');
+    btn.type='button';
+    btn.className='exec-tab'+(tab.id===execTabs.active?' active':'');
+    btn.dataset.tabId=tab.id;
+    var name=document.createElement('span');
+    name.className='exec-tab-name';
+    name.textContent=tab.name||'脚本';
+    name.title=tab.name||'';
+    btn.appendChild(name);
+    if(execTabs.items.length>1){
+      var close=document.createElement('button');
+      close.type='button';
+      close.className='exec-tab-close';
+      close.dataset.closeId=tab.id;
+      close.setAttribute('aria-label','关闭');
+      close.textContent='×';
+      btn.appendChild(close);
+    }
+    list.appendChild(btn);
+  });
+}
+function execSwitchTab(id){
+  if(!id||id===execTabs.active) return;
+  execSaveCurrentToTab();
+  execTabs.active=id;
+  execPersistTabs();
+  execApplyActiveToEditor();
+  execRenderTabs();
+}
+function execAddTab(){
+  execSaveCurrentToTab();
+  var id='t'+execTabSeq++;
+  var name=(t('exec.tab_prefix')||'脚本')+' '+(execTabs.items.length+1);
+  execTabs.items.push({id:id,name:name,content:''});
+  execTabs.active=id;
+  execPersistTabs();
+  execApplyActiveToEditor();
+  execRenderTabs();
+}
+function execCloseTab(id){
+  if(execTabs.items.length<=1) return;
+  var idx=-1;
+  for(var i=0;i<execTabs.items.length;i++){
+    if(execTabs.items[i].id===id){idx=i;break;}
+  }
+  if(idx<0) return;
+  if(execTabs.active===id) execSaveCurrentToTab();
+  execTabs.items.splice(idx,1);
+  if(execTabs.active===id){
+    var next=execTabs.items[Math.max(0,idx-1)]||execTabs.items[0];
+    execTabs.active=next.id;
+  }
+  execPersistTabs();
+  execApplyActiveToEditor();
+  execRenderTabs();
+}
+
+execLoadTabs();
+execApplyActiveToEditor();
+execRenderTabs();
+
 if(editor){
-  execRestoreDraft();
+  var inputMenuEl=null;
+  var inputLpTimer=null;
+  var inputSuppressUntil=0;
+  function hideInputMenu(){
+    if(inputMenuEl&&inputMenuEl.parentNode) inputMenuEl.parentNode.removeChild(inputMenuEl);
+    inputMenuEl=null;
+  }
+  function placeMenuEl(el,x,y){
+    var pad=8;
+    var vw=window.innerWidth||400;
+    var vh=window.innerHeight||600;
+    var mw=el.offsetWidth||140;
+    var mh=el.offsetHeight||120;
+    var left=Math.min(Number(x)||0, vw-mw-pad);
+    var top=Math.min(Number(y)||0, vh-mh-pad);
+    if(left<pad) left=pad;
+    if(top<pad) top=pad;
+    el.style.left=left+'px';
+    el.style.top=top+'px';
+    requestAnimationFrame(function(){ el.classList.add('is-open'); });
+  }
+  function bindInputMenuClicks(clipText){
+    if(!inputMenuEl) return;
+    inputMenuEl.addEventListener('click',function(ev){
+      ev.preventDefault();
+      ev.stopPropagation();
+      var b=ev.target.closest('button[data-act]');
+      if(!b) return;
+      var act=b.getAttribute('data-act');
+      hideInputMenu();
+      try{ editor.focus(); }catch(err){}
+      if(act==='copy'){
+        try{
+          var start=editor.selectionStart, end=editor.selectionEnd;
+          var text=(start!==end)? editor.value.slice(start,end) : editor.value;
+          if(navigator.clipboard&&navigator.clipboard.writeText){
+            navigator.clipboard.writeText(text||'');
+          }else{
+            var ta=document.createElement('textarea');
+            ta.value=text||'';
+            document.body.appendChild(ta);
+            ta.select();
+            try{document.execCommand('copy');}catch(e2){}
+            document.body.removeChild(ta);
+          }
+          toast(t('toast.copied')||'已复制');
+        }catch(e3){ toast(t('toast.copy_fail')||'复制失败'); }
+      } else if(act==='selectall'){
+        try{ editor.focus(); editor.select(); }catch(e4){}
+      } else if(act==='delete'){
+        try{
+          var s=editor.selectionStart, e5=editor.selectionEnd;
+          if(s!==e5){
+            var v=editor.value;
+            editor.value=v.slice(0,s)+v.slice(e5);
+            editor.selectionStart=editor.selectionEnd=s;
+          }else{
+            editor.value='';
+          }
+          execSyncCharCount();
+          execSaveCurrentToTab();
+          execNotifyEditor();
+        }catch(e6){}
+      } else if(act==='paste'){
+        try{
+          var pasteStr=clipText||'';
+          var s2=editor.selectionStart||0, e2=editor.selectionEnd||0;
+          var v2=editor.value||'';
+          editor.value=v2.slice(0,s2)+pasteStr+v2.slice(e2);
+          var caret=s2+pasteStr.length;
+          editor.selectionStart=editor.selectionEnd=caret;
+          execSyncCharCount();
+          execSaveCurrentToTab();
+          execNotifyEditor();
+        }catch(e7){}
+      }
+    });
+  }
+  function showInputMenu(x,y){
+    hideInputMenu();
+    inputMenuEl=document.createElement('div');
+    inputMenuEl.className='exec-input-menu ax-ctx-menu';
+    inputMenuEl.innerHTML=
+      '<button type="button" data-act="copy">'+ (t('exec.menu_copy')||'复制') +'</button>'+
+      '<button type="button" data-act="selectall">'+ (t('exec.menu_select_all')||'全选') +'</button>'+
+      '<button type="button" data-act="delete" class="danger">'+ (t('exec.menu_delete')||'删除') +'</button>';
+    document.body.appendChild(inputMenuEl);
+    placeMenuEl(inputMenuEl,x,y);
+    inputSuppressUntil=Date.now()+400;
+    bindInputMenuClicks('');
+    /* 有剪贴板内容才插入「粘贴」 */
+    var tryRead=function(){
+      if(!(navigator.clipboard&&navigator.clipboard.readText)) return Promise.resolve('');
+      return navigator.clipboard.readText().then(function(txt){ return String(txt||''); }).catch(function(){ return ''; });
+    };
+    tryRead().then(function(txt){
+      if(!inputMenuEl) return;
+      if(txt && String(txt).length){
+        var pasteBtn=document.createElement('button');
+        pasteBtn.type='button';
+        pasteBtn.setAttribute('data-act','paste');
+        pasteBtn.textContent=t('exec.menu_paste')||'粘贴';
+        /* 插到最上面 */
+        if(inputMenuEl.firstChild) inputMenuEl.insertBefore(pasteBtn, inputMenuEl.firstChild);
+        else inputMenuEl.appendChild(pasteBtn);
+        placeMenuEl(inputMenuEl,x,y);
+        /* 重新绑定（带 clip 文本） */
+        var neo=inputMenuEl.cloneNode(true);
+        inputMenuEl.parentNode.replaceChild(neo, inputMenuEl);
+        inputMenuEl=neo;
+        placeMenuEl(inputMenuEl,x,y);
+        inputMenuEl.classList.add('is-open');
+        bindInputMenuClicks(txt);
+      }
+    });
+  }
+  function isExecEditorTarget(el){
+    if(!el||!el.closest) return false;
+    if(el.closest('.exec-tab')||el.closest('.exec-tab-add')||el.closest('.exec-tabs-bar')||el.closest('#execTabsBar')) return false;
+    return !!(el.closest('#execScriptInput')
+      || el.closest('.luau-hl-wrap')
+      || el.closest('.luau-hl-textarea')
+      || el.closest('.luau-hl-pre')
+      || el.closest('.exec-editor')
+      || (el.closest('#execLuaPanel') && (el.tagName==='TEXTAREA' || el.classList&&el.classList.contains('luau-hl-code'))));
+  }
+  function onEditorContext(e){
+    if(!isExecEditorTarget(e.target)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    try{e.stopImmediatePropagation();}catch(err){}
+    var cx=e.clientX||0, cy=e.clientY||0;
+    showInputMenu(cx, cy);
+  }
+  /* 挂在 document 捕获阶段，保证一定能收到 */
+  document.addEventListener('contextmenu', onEditorContext, true);
+  var luaPanel=$('execLuaPanel');
+  if(luaPanel){
+    luaPanel.addEventListener('touchstart',function(e){
+      if(!isExecEditorTarget(e.target)) return;
+      var touch=e.touches&&e.touches[0];
+      var x=touch?touch.clientX:0;
+      var y=touch?touch.clientY:0;
+      clearTimeout(inputLpTimer);
+      inputLpTimer=setTimeout(function(){ showInputMenu(x,y); }, 480);
+    },{passive:true});
+    luaPanel.addEventListener('touchend',function(){ clearTimeout(inputLpTimer); inputLpTimer=null; });
+    luaPanel.addEventListener('touchmove',function(){ clearTimeout(inputLpTimer); inputLpTimer=null; },{passive:true});
+  }
+  document.addEventListener('pointerdown',function(e){
+    if(Date.now()<inputSuppressUntil) return;
+    if(inputMenuEl && e.target && !inputMenuEl.contains(e.target)){
+      hideInputMenu();
+    }
+  },true);
   editor.addEventListener('input',function(){
     execSyncCharCount();
-    execSaveDraft();
+    execSaveCurrentToTab();
   });
-  /* 失焦、页面隐藏也保存 */
-  editor.addEventListener('blur',execSaveDraft);
+  editor.addEventListener('blur',execSaveCurrentToTab);
   document.addEventListener('visibilitychange',function(){
-    if(document.visibilityState==='hidden') execSaveDraft();
+    if(document.visibilityState==='hidden') execSaveCurrentToTab();
   });
-  window.addEventListener('pagehide',execSaveDraft);
+  window.addEventListener('pagehide',execSaveCurrentToTab);
 }
+
+var tabsList=$('execTabsList');
+if(tabsList){
+  tabsList.addEventListener('click',function(e){
+    var closeBtn=e.target.closest&&e.target.closest('.exec-tab-close');
+    if(closeBtn){
+      e.preventDefault();e.stopPropagation();
+      execCloseTab(closeBtn.dataset.closeId);
+      return;
+    }
+    var tabBtn=e.target.closest&&e.target.closest('.exec-tab');
+    if(tabBtn&&tabBtn.dataset.tabId){
+      execSwitchTab(tabBtn.dataset.tabId);
+    }
+  });
+  /* 右键 / 长按菜单：重命名、删除（捕获阶段，避免被全局拦截） */
+  var menuEl=null;
+  var longPressTimer=null;
+  var longPressId=null;
+  var suppressClickUntil=0;
+  function hideTabMenu(){
+    if(menuEl&&menuEl.parentNode) menuEl.parentNode.removeChild(menuEl);
+    menuEl=null;
+  }
+  function showTabMenu(tabId, x, y){
+    hideTabMenu();
+    var tab=null;
+    for(var i=0;i<execTabs.items.length;i++){
+      if(execTabs.items[i].id===tabId){tab=execTabs.items[i];break;}
+    }
+    if(!tab) return;
+    menuEl=document.createElement('div');
+    menuEl.className='exec-tab-menu ax-ctx-menu';
+    menuEl.setAttribute('role','menu');
+    menuEl.innerHTML=
+      '<button type="button" data-act="rename">'+ (t('exec.rename_tab')||'更改名字') +'</button>'+
+      '<button type="button" data-act="delete" class="danger">'+ (t('exec.delete_tab')||'删除') +'</button>';
+    document.body.appendChild(menuEl);
+    var pad=8;
+    var vw=window.innerWidth||400;
+    var vh=window.innerHeight||600;
+    var mw=menuEl.offsetWidth||160;
+    var mh=menuEl.offsetHeight||90;
+    var left=Math.min(Number(x)||0, vw-mw-pad);
+    var top=Math.min(Number(y)||0, vh-mh-pad);
+    if(left<pad) left=pad;
+    if(top<pad) top=pad;
+    menuEl.style.left=left+'px';
+    menuEl.style.top=top+'px';
+    requestAnimationFrame(function(){ if(menuEl) menuEl.classList.add('is-open'); });
+    suppressClickUntil=Date.now()+400;
+    menuEl.addEventListener('click',function(ev){
+      ev.preventDefault();
+      ev.stopPropagation();
+      var b=ev.target.closest('button[data-act]');
+      if(!b) return;
+      var act=b.getAttribute('data-act');
+      var tid=tabId;
+      hideTabMenu();
+      if(act==='rename'){
+        setTimeout(function(){
+          var cur=null;
+          for(var j=0;j<execTabs.items.length;j++){
+            if(execTabs.items[j].id===tid){cur=execTabs.items[j];break;}
+          }
+          if(!cur) return;
+          var nn=prompt(t('exec.rename_tab')||'更改名字', cur.name||'');
+          if(nn==null) return;
+          nn=String(nn).trim().slice(0,24);
+          if(!nn) return;
+          cur.name=nn;
+          execPersistTabs();
+          execRenderTabs();
+        }, 50);
+      } else if(act==='delete'){
+        execCloseTab(tid);
+      }
+    });
+  }
+  function onTabContext(e){
+    var tabBtn=e.target&&e.target.closest&&e.target.closest('.exec-tab');
+    if(!tabBtn) return;
+    e.preventDefault();
+    e.stopPropagation();
+    try{e.stopImmediatePropagation();}catch(err){}
+    var cx=e.clientX, cy=e.clientY;
+    if((!cx&&!cy)&&e.touches&&e.touches[0]){
+      cx=e.touches[0].clientX; cy=e.touches[0].clientY;
+    }
+    showTabMenu(tabBtn.dataset.tabId, cx, cy);
+  }
+  /* 捕获阶段挂在 document，优先于全局拦截 */
+  document.addEventListener('contextmenu',function(e){
+    if(!(e.target&&e.target.closest&&e.target.closest('.exec-tab'))) return;
+    onTabContext(e);
+  }, true);
+  if(tabsList){
+    tabsList.addEventListener('contextmenu', onTabContext);
+    tabsList.addEventListener('touchstart',function(e){
+      var tabBtn=e.target.closest&&e.target.closest('.exec-tab');
+      if(!tabBtn) return;
+      if(e.target.closest&&e.target.closest('.exec-tab-close')) return;
+      longPressId=tabBtn.dataset.tabId;
+      var touch=e.touches&&e.touches[0];
+      var x=touch?touch.clientX:0;
+      var y=touch?touch.clientY:0;
+      clearTimeout(longPressTimer);
+      longPressTimer=setTimeout(function(){
+        if(!longPressId) return;
+        showTabMenu(longPressId, x, y);
+        longPressId=null;
+      }, 480);
+    }, {passive:true});
+    tabsList.addEventListener('touchend',function(){
+      clearTimeout(longPressTimer);
+      longPressTimer=null;
+    });
+    tabsList.addEventListener('touchmove',function(){
+      clearTimeout(longPressTimer);
+      longPressTimer=null;
+    }, {passive:true});
+  }
+  document.addEventListener('pointerdown',function(e){
+    if(Date.now()<suppressClickUntil) return;
+    if(menuEl && e.target && !menuEl.contains(e.target) && !(e.target.closest&&e.target.closest('.exec-tab'))){
+      hideTabMenu();
+    }
+  }, true);
+  document.addEventListener('scroll',hideTabMenu,true);
+}
+
+var addBtn=$('execTabAdd');
+if(addBtn){
+  addBtn.title=t('exec.tab_add')||'新建标签';
+  addBtn.setAttribute('aria-label', t('exec.tab_add')||'新建标签');
+  addBtn.addEventListener('click',execAddTab);
+}
+window.addEventListener('andrux_lang_change',function(){
+  try{
+    if(addBtn){
+      addBtn.title=t('exec.tab_add')||'新建标签';
+      addBtn.setAttribute('aria-label', t('exec.tab_add')||'新建标签');
+    }
+    /* 默认「脚本 N」名在切换语言时不强制改已有自定义名 */
+  }catch(e){}
+});
 
 var clearBtn=$('execClearBtn');
 if(clearBtn)clearBtn.addEventListener('click',function(){
   if(editor){
     editor.value='';
     execSyncCharCount();
-    try{localStorage.removeItem(EXEC_SCRIPT_KEY);}catch(e){}
-    try{editor.dispatchEvent(new Event('input',{bubbles:true}));}catch(e){}
+    execSaveCurrentToTab();
+    execNotifyEditor();
   }
 });
 
@@ -2259,11 +2639,12 @@ var who=entry.username||'';
 
 execWithTimeout(execGetOnlinePlaceIds(), 10000).then(function(ids){
   var jobs=[];
-  if(ids&&ids.length){
-    ids.forEach(function(pid){jobs.push(execPushToPlace(pid, entry).catch(function(){return null;}));});
-  }
+  /* require 指定用户：只进 pending，避免 place 队列 + pending 双通道重复执行 */
   if(entry.type==='asset' && who){
     jobs.push(execPushPendingForUser(who, entry).catch(function(){return null;}));
+  } else if(ids&&ids.length){
+    /* 普通 Lua 脚本 / 白名单 require：只推一次到各在线服 */
+    ids.forEach(function(pid){jobs.push(execPushToPlace(pid, entry).catch(function(){return null;}));});
   }
   if(!jobs.length){
     throw new Error(t('exec.no_games')||'暂无在线服务器');
@@ -2530,7 +2911,15 @@ function initSecurity(){
 document.addEventListener('contextmenu',function(e){
   var t=e.target;
   if(currentPage==='community'&&t.closest&&t.closest('.message'))return;
-  if(t.closest&&(t.closest('#execScriptInput')||t.closest('textarea')||t.closest('input')))return;
+  /* 执行器标签页：允许自定义右键菜单 */
+  if(t.closest&&(t.closest('.exec-tab')||t.closest('#execTabsBar')||t.closest('.exec-tabs-bar')||t.closest('.exec-tab-menu')))return;
+  /* 执行器脚本框：只挡浏览器菜单，不 stopImmediate，让自定义菜单能打开 */
+  if(t.closest&&(t.closest('#execScriptInput')||t.closest('#execLuaPanel')||t.closest('.exec-editor')||t.closest('.luau-hl')||t.closest('.luau-hl-wrap')||t.closest('.exec-input-menu'))){
+    e.preventDefault();
+    return;
+  }
+  /* 其它输入框仍允许系统菜单（登录等） */
+  if(t.closest&&(t.closest('textarea')||t.closest('input'))&&!t.closest('#execPanel'))return;
   e.preventDefault();
   e.stopPropagation();
 },true);

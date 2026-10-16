@@ -447,3 +447,70 @@ button.primary-btn:disabled{
   pointer-events:none!important;
   box-shadow:none!important;
 }
+
+.exec-tabs-bar{display:flex;align-items:center;gap:6px;margin-bottom:10px;flex-wrap:wrap;}
+.exec-tabs-list{display:flex;align-items:center;gap:6px;flex-wrap:wrap;flex:1;min-width:0;}
+.exec-tab{
+  display:inline-flex;align-items:center;gap:6px;max-width:160px;
+  padding:6px 10px;border-radius:10px;border:1px solid var(--rule);
+  background:rgba(255,250,241,0.65);color:var(--muted);font-size:12px;font-weight:600;
+  cursor:pointer;transition:background .15s ease,border-color .15s ease,color .15s ease;
+}
+.exec-tab:hover{border-color:var(--accent);color:var(--ink);}
+.exec-tab.active{background:rgba(111,77,45,0.12);border-color:var(--accent);color:var(--ink);}
+.exec-tab-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:110px;}
+.exec-tab-close{
+  flex-shrink:0;width:16px;height:16px;border:none;border-radius:50%;
+  background:transparent;color:var(--muted);cursor:pointer;font-size:12px;line-height:1;padding:0;
+}
+.exec-tab-close:hover{background:rgba(138,45,45,0.15);color:var(--bad);}
+.exec-tab-add{
+  width:32px;height:32px;border-radius:10px;border:1px dashed var(--rule);
+  background:transparent;color:var(--muted);font-size:18px;line-height:1;cursor:pointer;
+}
+.exec-tab-add:hover{border-color:var(--accent);color:var(--ink);}
+
+.exec-tab-menu{
+  position:fixed;z-index:2147483000;min-width:140px;
+  background:#fffaf1;border:1px solid var(--rule);border-radius:12px;
+  box-shadow:0 12px 40px rgba(33,26,16,0.18);padding:6px;display:flex;flex-direction:column;gap:2px;
+}
+.exec-tab-menu button{
+  border:none;background:transparent;text-align:left;padding:10px 12px;border-radius:8px;
+  font-size:13px;font-weight:600;color:var(--ink);cursor:pointer;
+}
+.exec-tab-menu button:hover{background:rgba(111,77,45,0.1);}
+.exec-tab-menu button.danger{color:var(--bad);}
+.exec-tab-menu button.danger:hover{background:rgba(138,45,45,0.12);}
+
+.exec-input-menu{
+  position:fixed;z-index:2147483000;min-width:140px;
+  background:#fffaf1;border:1px solid var(--rule);border-radius:12px;
+  box-shadow:0 12px 40px rgba(33,26,16,0.18);padding:6px;display:flex;flex-direction:column;gap:2px;
+}
+.exec-input-menu button{
+  border:none;background:transparent;text-align:left;padding:10px 12px;border-radius:8px;
+  font-size:13px;font-weight:600;color:var(--ink);cursor:pointer;
+}
+.exec-input-menu button:hover{background:rgba(111,77,45,0.1);}
+.exec-input-menu button.danger{color:var(--bad);}
+.exec-input-menu button.danger:hover{background:rgba(138,45,45,0.12);}
+
+/* 右键/长按菜单渐入 */
+.ax-ctx-menu,
+.exec-input-menu,
+.exec-tab-menu,
+.context-menu{
+  opacity:0;
+  transform:translateY(6px) scale(0.96);
+  transition:opacity .16s ease, transform .18s cubic-bezier(.2,.8,.2,1);
+  transform-origin:top left;
+}
+.ax-ctx-menu.is-open,
+.exec-input-menu.is-open,
+.exec-tab-menu.is-open,
+.context-menu.is-open,
+.context-menu.show{
+  opacity:1;
+  transform:translateY(0) scale(1);
+}
