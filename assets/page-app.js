@@ -17,6 +17,243 @@ var ADMIN_HASH_PARTS=[0x2a,0xdb,0xa7,0x8f,0x2b,0x0e,0x1d,0x27,0x1e,0x57,0x7e,0x4
 /* i18n helper — translate key via global I18N engine */
 function t(k){return(window.I18N&&window.I18N.t)?window.I18N.t(k):k;}
 
+
+/* ===== Custom CSS dialogs ===== */
+function axEnsureModalRoot(){
+  var root=document.getElementById('axModalRoot');
+  if(root) return root;
+  root=document.createElement('div');
+  root.id='axModalRoot';
+  root.className='ax-modal-root';
+  root.innerHTML='<div class="ax-modal-card" role="dialog" aria-modal="true">'+
+    '<h3 class="ax-modal-title" id="axModalTitle"></h3>'+
+    '<p class="ax-modal-body" id="axModalBody"></p>'+
+    '<input class="ax-modal-input hidden" id="axModalInput" type="text" autocomplete="off">'+
+    '<div class="ax-modal-actions" id="axModalActions"></div></div>';
+  (document.body||document.documentElement).appendChild(root);
+  return root;
+}
+function axShowModal(opts){
+  opts=opts||{};
+  return new Promise(function(resolve){
+    try{
+      var root=axEnsureModalRoot();
+      var title=document.getElementById('axModalTitle');
+      var body=document.getElementById('axModalBody');
+      var input=document.getElementById('axModalInput');
+      var actions=document.getElementById('axModalActions');
+      if(!title||!body||!actions){ resolve(opts.mode==='confirm'?false:null); return; }
+      title.textContent=opts.title||((window.I18N&&window.I18N.t)?window.I18N.t('misc.notice'):'提示')||'提示';
+      body.textContent=String(opts.message||'');
+      actions.innerHTML='';
+      var mode=opts.mode||'confirm';
+      if(mode==='prompt'){
+        input.classList.remove('hidden');
+        input.value=opts.defaultValue!=null?String(opts.defaultValue):'';
+      }else{
+        input.classList.add('hidden');
+        input.value='';
+      }
+      var done=false;
+      function finish(val){
+        if(done) return;
+        done=true;
+        root.classList.remove('is-open');
+        document.removeEventListener('keydown', onKey, true);
+        resolve(val);
+      }
+      function onKey(e){
+        if(e.key==='Escape'){ e.preventDefault(); finish(mode==='confirm'?false:(mode==='alert'?true:null)); }
+      }
+      document.addEventListener('keydown', onKey, true);
+      function mkBtn(cls, text, val){
+        var b=document.createElement('button');
+        b.type='button'; b.className=cls; b.textContent=text;
+        b.addEventListener('click', function(ev){ ev.preventDefault(); finish(val); });
+        actions.appendChild(b);
+        return b;
+      }
+      var okLabel=((window.I18N&&window.I18N.t)?window.I18N.t('misc.ok'):null)||'确定';
+      var cancelLabel=((window.I18N&&window.I18N.t)?window.I18N.t('misc.cancel'):null)||'取消';
+      if(mode==='alert'){
+        mkBtn('primary-btn', opts.okText||okLabel, true);
+      } else if(mode==='prompt'){
+        mkBtn('ghost-btn', opts.cancelText||cancelLabel, null);
+        mkBtn('primary-btn', opts.okText||okLabel, 'SUBMIT');
+      } else {
+        mkBtn('ghost-btn', opts.cancelText||cancelLabel, false);
+        mkBtn(opts.danger?'danger-btn':'primary-btn', opts.okText||okLabel, true);
+      }
+      root.onclick=function(e){ if(e.target===root) finish(mode==='confirm'?false:(mode==='alert'?true:null)); };
+      /* prompt: resolve input value on OK */
+      if(mode==='prompt'){
+        actions.querySelectorAll('button').forEach(function(b){
+          b.onclick=function(ev){
+            ev.preventDefault();
+            if(b.classList.contains('primary-btn')) finish(input.value);
+            else finish(null);
+          };
+        });
+        setTimeout(function(){ try{ input.focus(); input.select(); }catch(e){} }, 30);
+      }
+      root.classList.add('is-open');
+      requestAnimationFrame(function(){ root.classList.add('is-open'); });
+    }catch(err){
+      /* fallback */
+      if(opts.mode==='alert'){ try{ alert(opts.message); }catch(e){} resolve(true); }
+      else if(opts.mode==='prompt'){ try{ resolve(prompt(opts.message, opts.defaultValue||'')); }catch(e){ resolve(null); } }
+      else { try{ resolve(confirm(opts.message)); }catch(e){ resolve(false); } }
+    }
+  });
+}
+function axAlert(message, title){ return axShowModal({mode:'alert', message:message, title:title}); }
+function axConfirm(message, title, danger){ return axShowModal({mode:'confirm', message:message, title:title, danger:!!danger}); }
+function axPrompt(message, defaultValue, title){ return axShowModal({mode:'prompt', message:message, defaultValue:defaultValue, title:title}); }
+window.axAlert=axAlert;
+window.axConfirm=axConfirm;
+window.axPrompt=axPrompt;
+window.axShowModal=axShowModal;
+
+/* ===== Custom CSS selects ===== */
+function axEnhanceSelect(sel){
+  if(!sel || sel.tagName!=='SELECT' || sel.dataset.axSelect==='1') return;
+  sel.dataset.axSelect='1';
+  var wrap=document.createElement('div');
+  wrap.className='ax-select';
+  if(sel.classList.contains('admin-select')) wrap.classList.add('admin-select');
+  if(sel.id) wrap.dataset.for=sel.id;
+  var trigger=document.createElement('button');
+  trigger.type='button';
+  trigger.className='ax-select-trigger';
+  trigger.setAttribute('aria-haspopup','listbox');
+  var valueEl=document.createElement('span');
+  valueEl.className='ax-select-value';
+  var caret=document.createElement('span');
+  caret.className='ax-select-caret';
+  caret.textContent='▾';
+  trigger.appendChild(valueEl);
+  trigger.appendChild(caret);
+  var menu=document.createElement('div');
+  menu.className='ax-select-menu';
+  menu.setAttribute('role','listbox');
+
+  function labelOf(opt){
+    if(!opt) return '';
+    return (opt.textContent||opt.label||opt.value||'').trim();
+  }
+  function syncLabel(){
+    var opt=sel.options[sel.selectedIndex];
+    valueEl.textContent=labelOf(opt)||'—';
+  }
+  function rebuild(){
+    menu.innerHTML='';
+    Array.prototype.forEach.call(sel.options, function(opt, idx){
+      var btn=document.createElement('button');
+      btn.type='button';
+      btn.className='ax-select-option'+(idx===sel.selectedIndex?' is-active':'');
+      btn.textContent=labelOf(opt);
+      if(opt.disabled){ btn.disabled=true; btn.style.opacity='0.45'; }
+      btn.addEventListener('click', function(e){
+        e.preventDefault(); e.stopPropagation();
+        sel.selectedIndex=idx;
+        try{ sel.dispatchEvent(new Event('change',{bubbles:true})); }catch(err){}
+        syncLabel();
+        closeMenu();
+      });
+      menu.appendChild(btn);
+    });
+    syncLabel();
+  }
+  function placeMenu(){
+    var r=trigger.getBoundingClientRect();
+    var w=Math.max(r.width, 132);
+    menu.style.position='fixed';
+    menu.style.left=Math.round(r.left)+'px';
+    menu.style.top=Math.round(r.bottom+6)+'px';
+    menu.style.width=Math.round(w)+'px';
+    menu.style.right='auto';
+    menu.style.minWidth=Math.round(w)+'px';
+    menu.style.maxWidth='min(240px, 90vw)';
+    /* flip up if near bottom */
+    var spaceBelow=window.innerHeight-(r.bottom+6);
+    if(spaceBelow<160 && r.top>spaceBelow){
+      menu.style.top='auto';
+      menu.style.bottom=Math.round(window.innerHeight-r.top+6)+'px';
+    }else{
+      menu.style.bottom='auto';
+    }
+  }
+  function openMenu(){
+    document.querySelectorAll('.ax-select.is-open').forEach(function(w){
+      if(w!==wrap) w.classList.remove('is-open');
+    });
+    document.querySelectorAll('.ax-select-menu.is-open').forEach(function(m){
+      if(m!==menu) m.classList.remove('is-open');
+    });
+    rebuild();
+    wrap.classList.add('is-open');
+    if(menu.parentNode!==document.body) document.body.appendChild(menu);
+    menu.classList.add('is-open');
+    placeMenu();
+  }
+  function closeMenu(){
+    wrap.classList.remove('is-open');
+    menu.classList.remove('is-open');
+  }
+  trigger.addEventListener('click', function(e){
+    e.preventDefault(); e.stopPropagation();
+    if(wrap.classList.contains('is-open')) closeMenu();
+    else openMenu();
+  });
+  sel.classList.add('ax-select-native-hidden');
+  if(sel.parentNode){
+    sel.parentNode.insertBefore(wrap, sel);
+  }
+  wrap.appendChild(trigger);
+  wrap.appendChild(sel);
+  /* menu lives on body while open to avoid overflow clip */
+  rebuild();
+  sel.addEventListener('change', function(){ syncLabel(); });
+  wrap._axSync=syncLabel;
+  wrap._axRebuild=rebuild;
+  sel._axSelectWrap=wrap;
+  window.addEventListener('scroll', function(){ if(wrap.classList.contains('is-open')) placeMenu(); }, true);
+  window.addEventListener('resize', function(){ if(wrap.classList.contains('is-open')) placeMenu(); });
+}
+function axEnhanceAllSelects(root){
+  root=root||document;
+  try{
+    root.querySelectorAll('select').forEach(function(sel){
+      if(sel.dataset.axSelect==='1') return;
+      axEnhanceSelect(sel);
+    });
+  }catch(e){}
+}
+function axRefreshSelectLabels(){
+  try{
+    document.querySelectorAll('.ax-select').forEach(function(w){
+      if(typeof w._axRebuild==='function') w._axRebuild();
+      else if(typeof w._axSync==='function') w._axSync();
+    });
+  }catch(e){}
+}
+window.axEnhanceSelect=axEnhanceSelect;
+window.axEnhanceAllSelects=axEnhanceAllSelects;
+window.axRefreshSelectLabels=axRefreshSelectLabels;
+window.addEventListener('andrux_lang_change',function(){
+  try{
+    /* 文案已在 apply 中更新，只需刷新自定义下拉显示 */
+    setTimeout(function(){ axRefreshSelectLabels(); }, 0);
+  }catch(e){}
+});
+document.addEventListener('click', function(e){
+  if(e.target.closest && (e.target.closest('.ax-select') || e.target.closest('.ax-select-menu'))) return;
+  document.querySelectorAll('.ax-select.is-open').forEach(function(w){ w.classList.remove('is-open'); });
+  document.querySelectorAll('.ax-select-menu.is-open').forEach(function(m){ m.classList.remove('is-open'); });
+});
+
+
+
 /* ==========================================================
    SECURITY ENGINE — Anti-DDoS / Anti-SQLi / Anti-Hijack / Anti-Spam
    ========================================================== */
@@ -628,11 +865,33 @@ return api(T_USERS,'?c2=eq.'+encodeURIComponent(norm)+'&select=*');
 if(!rows.length)throw new Error(t('val.login_fail'));
 return hashText(norm+':'+pass).then(function(hash){
 if(hash!==rows[0].c3)throw new Error(t('val.login_fail'));
-saveSession(rows[0]);
-setNotice($('loginNotice'),t('auth.login_ok'),'ok');
-toast(t('toast.login_ok'));
-getIP().then(function(ip){rpcCall('record_login_attempt',{p_ip:ip,p_username:norm,p_success:true}).catch(function(){});});
-setTimeout(function(){location.href='./pages/dashboard.html';},300);
+var urow=rows[0];
+return processScheduledAccountDeletion(urow).then(function(purged){
+  if(purged) return;
+  var at=getUserDeleteAt(urow);
+  if(at && Date.now()<at){
+    var d=new Date(at);
+    var ask=(t('set.login_delete_prompt')||'该账号已申请注销，将于 {date} 删除数据。\n\n是否取消注销并登录？\n\n确定 = 取消注销并登录\n取消 = 不登录，留在此页').replace('{date}', d.toLocaleString());
+    return axConfirm(ask, null, true).then(function(ok){
+      if(!ok){
+        setNotice($('loginNotice'), t('set.login_delete_stay')||'已选择不取消注销，未登录', 'bad');
+        return;
+      }
+      return cancelAccountDeletion(urow.c0).then(function(){
+        saveSession(urow);
+        setNotice($('loginNotice'),t('auth.login_ok'),'ok');
+        toast(t('set.delete_cancelled')||'已撤销注销');
+        getIP().then(function(ip){rpcCall('record_login_attempt',{p_ip:ip,p_username:norm,p_success:true}).catch(function(){});});
+        setTimeout(function(){location.href='./pages/dashboard.html';},300);
+      });
+    });
+  }
+  saveSession(urow);
+  setNotice($('loginNotice'),t('auth.login_ok'),'ok');
+  toast(t('toast.login_ok'));
+  getIP().then(function(ip){rpcCall('record_login_attempt',{p_ip:ip,p_username:norm,p_success:true}).catch(function(){});});
+  setTimeout(function(){location.href='./pages/dashboard.html';},300);
+});
 });
 }).catch(function(err){
 getIP().then(function(ip){rpcCall('record_login_attempt',{p_ip:ip,p_username:norm,p_success:false}).catch(function(){});});
@@ -1402,7 +1661,8 @@ var uid=btn.dataset.uid;
 var mid=btn.dataset.mid;
 
 if(action==='delete-user'&&uid){
-if(!confirm(t('misc.confirm_delete_user')||'确定删除该账户？白名单、社区发言、发布的脚本将一并删除，对方将被强制下线。'))return;
+axConfirm(t('misc.confirm_delete_user')||'确定删除该账户？白名单、社区发言、发布的脚本将一并删除，对方将被强制下线。',null,true).then(function(ok){
+if(!ok)return;
 api(T_USERS,'?c0=eq.'+encodeURIComponent(uid)+'&select=c0,c1',{skipRate:true}).then(function(rows){
   var uname=(rows&&rows[0]&&rows[0].c1)?String(rows[0].c1):'';
   var jobs=[];
@@ -1427,6 +1687,7 @@ api(T_USERS,'?c0=eq.'+encodeURIComponent(uid)+'&select=c0,c1',{skipRate:true}).t
   loadAdminMessages();
   try{loadAdminHubCards();}catch(e){}
 }).catch(function(){toast(t('toast.delete_fail'));});
+});
 }
 
 if(action==='view-profile'&&uid){
@@ -1434,7 +1695,7 @@ location.href='./profile.html?uid='+encodeURIComponent(uid);
 }
 
 if(action==='mute-user'&&uid){
-var mins=prompt(t('misc.mute_prompt'));
+axPrompt(t('misc.mute_prompt')||'禁言分钟数').then(function(mins){
 if(mins===null)return;
 var m=parseInt(mins,10);
 if(isNaN(m)||m<=0)return toast(t('misc.invalid_number'));
@@ -1442,6 +1703,7 @@ var until=m>=99999?'9999-12-31T23:59:59.000Z':new Date(Date.now()+m*60000).toISO
 api(T_USERS,'?c0=eq.'+encodeURIComponent(uid),{method:'PATCH',body:JSON.stringify({c4:until})}).then(function(){
 toast(t('toast.muted'));loadAdminUsers();
 }).catch(function(){toast(t('toast.mute_fail'));});
+});
 }
 
 if(action==='unmute-user'&&uid){
@@ -1451,17 +1713,21 @@ toast(t('toast.unmuted'));loadAdminUsers();
 }
 
 if(action==='clear-user-msgs'&&uid){
-if(!confirm(t('misc.confirm_clear_msgs')))return;
+axConfirm(t('misc.confirm_clear_msgs')).then(function(ok){
+if(!ok)return;
 api(T_MSGS,'?c1=eq.'+encodeURIComponent(uid),{method:'DELETE'}).then(function(){
 toast(t('toast.cleared_msgs'));loadAdminMessages();
 }).catch(function(){toast(t('toast.clear_fail'));});
+});
 }
 
 if(action==='delete-msg'&&mid){
-if(!confirm(t('misc.confirm_delete_msg')))return;
+axConfirm(t('misc.confirm_delete_msg'),null,true).then(function(ok){
+if(!ok)return;
 api(T_MSGS,'?c0=eq.'+encodeURIComponent(mid),{method:'DELETE'}).then(function(){
 toast(t('toast.deleted_user'));loadAdminMessages();
 }).catch(function(){toast(t('toast.delete_fail'));});
+});
 }
 
 if(action==='toggle-game'){
@@ -1490,7 +1756,8 @@ loadAdminGames();
 if(action==='delete-game'){
 var gid=btn.dataset.gid||'';
 var pid=btn.dataset.placeId||btn.getAttribute('data-place-id')||'';
-if(!confirm(t('admin.confirm_delete_game')||'确定删除该游戏上报？'))return;
+axConfirm(t('admin.confirm_delete_game')||'确定删除该游戏上报？',null,true).then(function(ok){
+if(!ok)return;
 var q='';
 if(gid) q='?id=eq.'+encodeURIComponent(gid);
 else if(pid) q='?place_id=eq.'+encodeURIComponent(pid);
@@ -1507,27 +1774,135 @@ loadAdminGames();
   }
   toast(t('toast.delete_fail'));
 });
+});
 }
 
 
 if(action==='delete-hub'){
 var hid=btn.dataset.hid;
 if(!hid)return;
-if(!confirm(t('admin.confirm_delete_hub')))return;
+axConfirm(t('admin.confirm_delete_hub'),null,true).then(function(ok){
+if(!ok)return;
 api(T_HUB,'?id=eq.'+encodeURIComponent(hid),{method:'DELETE'}).then(function(){
 toast(t('toast.hub_deleted'));loadAdminHubCards();
 }).catch(function(){toast(t('toast.delete_fail'));});
+});
 }
 
 if(action==='delete-user-msgs'&&uid){
-if(!confirm(t('misc.confirm_clear_msgs')))return;
+axConfirm(t('misc.confirm_clear_msgs')).then(function(ok){
+if(!ok)return;
 api(T_MSGS,'?c1=eq.'+encodeURIComponent(uid),{method:'DELETE'}).then(function(){
 toast(t('toast.cleared_msgs'));loadAdminMessages();
 }).catch(function(){toast(t('toast.clear_fail'));});
+});
 }
 });
 
 /* ===== Settings ===== */
+
+/* ===== Account deletion (7-day grace) ===== */
+function getUserDeleteAt(user){
+  if(!user) return null;
+  /* 只用 delete_at；切勿用 c6（注册时间），否则所有账号都会被误判为已注销 */
+  if(user.delete_at){
+    var t = new Date(user.delete_at).getTime();
+    return isNaN(t) ? null : t;
+  }
+  /* 无 delete_at 列时的兜底：c5 以 DEL: 开头才算注销时间 */
+  var c5 = user.c5;
+  if(typeof c5 === 'string' && c5.indexOf('DEL:') === 0){
+    var t2 = new Date(c5.slice(4)).getTime();
+    return isNaN(t2) ? null : t2;
+  }
+  return null;
+}
+function purgeAccountData(uid, uname){
+  uid = String(uid||'');
+  uname = String(uname||'');
+  var jobs=[];
+  if(uid){
+    jobs.push(api(T_MSGS,'?c1=eq.'+encodeURIComponent(uid),{method:'DELETE',skipRate:true}).catch(function(){}));
+  }
+  if(uname){
+    jobs.push(api(T_MSGS,'?c2=eq.'+encodeURIComponent(uname),{method:'DELETE',skipRate:true}).catch(function(){}));
+    jobs.push(api(T_HUB,'?author=eq.'+encodeURIComponent(uname),{method:'DELETE',skipRate:true}).catch(function(){}));
+    jobs.push(api(T_HUB,'?author=eq.'+encodeURIComponent(uname.toLowerCase()),{method:'DELETE',skipRate:true}).catch(function(){}));
+    jobs.push(api('ax_rb','?c1=eq.'+encodeURIComponent(uname),{method:'DELETE',skipRate:true}).catch(function(){}));
+    jobs.push(api('ax_rb','?c1=eq.'+encodeURIComponent(uname.toLowerCase()),{method:'DELETE',skipRate:true}).catch(function(){}));
+  }
+  if(uid){
+    jobs.push(api(T_USERS,'?c0=eq.'+encodeURIComponent(uid),{method:'DELETE',skipRate:true}).catch(function(){}));
+  }
+  return Promise.all(jobs);
+}
+function processScheduledAccountDeletion(user){
+  if(!user||!user.c0) return Promise.resolve(false);
+  var at = getUserDeleteAt(user);
+  if(!at) return Promise.resolve(false);
+  if(Date.now() < at) return Promise.resolve(false);
+  /* 7 天已满：清理数据并强制下线 */
+  return purgeAccountData(user.c0, user.c1).then(function(){
+    try{
+      localStorage.removeItem('andrux_session');
+      sessionStorage.removeItem('andrux_admin_ok');
+    }catch(e){}
+    session=null;
+    toast(t('set.delete_done')||'账号已按期注销并清理数据');
+    setTimeout(function(){ location.href='../andrux-dashboard.html'; }, 900);
+    return true;
+  }).catch(function(){ return false; });
+}
+function scheduleAccountDeletion(){
+  if(!session||!session.id) return Promise.reject(new Error('no session'));
+  var when = new Date(Date.now() + 7*24*60*60*1000).toISOString();
+  /* 只用 delete_at；失败则写 c5=DEL:时间（绝不写 c6 注册时间） */
+  return api(T_USERS,'?c0=eq.'+encodeURIComponent(session.id),{
+    method:'PATCH', body:JSON.stringify({delete_at:when}), skipRate:true
+  }).catch(function(){
+    return api(T_USERS,'?c0=eq.'+encodeURIComponent(session.id),{
+      method:'PATCH', body:JSON.stringify({c5:'DEL:'+when}), skipRate:true
+    });
+  }).then(function(){ return when; });
+}
+function cancelAccountDeletion(uid){
+  uid = uid || (session && session.id);
+  if(!uid) return Promise.reject(new Error('no session'));
+  return api(T_USERS,'?c0=eq.'+encodeURIComponent(uid),{
+    method:'PATCH', body:JSON.stringify({delete_at:null}), skipRate:true
+  }).catch(function(){
+    return api(T_USERS,'?c0=eq.'+encodeURIComponent(uid),{
+      method:'PATCH', body:JSON.stringify({c5:null}), skipRate:true
+    });
+  });
+}
+function refreshDeleteAccountUI(){
+  var statusEl=$('deleteAccountStatus');
+  var btn=$('deleteAccountBtn');
+  var cancelBtn=$('cancelDeleteAccountBtn');
+  if(!session||!session.id) return;
+  api(T_USERS,'?c0=eq.'+encodeURIComponent(session.id)+'&select=c0,c1,c5,delete_at',{skipRate:true}).then(function(rows){
+    var u=rows&&rows[0];
+    if(!u) return;
+    var at=getUserDeleteAt(u);
+    if(at && Date.now()>=at){
+      return processScheduledAccountDeletion(u);
+    }
+    if(at && statusEl){
+      var d=new Date(at);
+      var txt=(t('set.delete_pending')||'账号将于 {date} 注销，此前可正常登录。').replace('{date}', d.toLocaleString());
+      statusEl.style.display='block';
+      statusEl.textContent=txt;
+      if(btn){ btn.disabled=true; btn.style.opacity='0.5'; }
+      if(cancelBtn) cancelBtn.classList.remove('hidden');
+    } else {
+      if(statusEl){ statusEl.style.display='none'; statusEl.textContent=''; }
+      if(btn){ btn.disabled=false; btn.style.opacity=''; }
+      if(cancelBtn) cancelBtn.classList.add('hidden');
+    }
+  }).catch(function(){});
+}
+
 function initSettings(){
 if(!requireSession())return;
 
@@ -1632,9 +2007,59 @@ if(logoToggle){
   });
 }
 
+var deleteAccountBtn=$('deleteAccountBtn');
+if(deleteAccountBtn)deleteAccountBtn.addEventListener('click',function(){
+  var msg=(t('set.delete_account_warn')||'警告：确认注销后将立即退出登录，并有 7 天后悔期。期满将永久删除社区发言、脚本中心作品与账户数据。7 天内再次登录时会询问是否撤销注销。\n\n确定继续注销吗？');
+  axConfirm(msg, null, true).then(function(ok){
+  if(!ok) return;
+  deleteAccountBtn.disabled=true;
+  scheduleAccountDeletion().then(function(){
+    toast(t('set.delete_scheduled_logout')||'已申请注销，即将退出登录。7 天内登录时可选择撤销');
+    try{
+      localStorage.removeItem('andrux_session');
+      sessionStorage.removeItem('andrux_admin_ok');
+    }catch(e){}
+    session=null;
+    setTimeout(function(){ location.href='../andrux-dashboard.html'; }, 800);
+  }).catch(function(){
+    toast(t('toast.op_fail')||'操作失败');
+    deleteAccountBtn.disabled=false;
+  });
+  });
+});
+var cancelDeleteAccountBtn=$('cancelDeleteAccountBtn');
+if(cancelDeleteAccountBtn)cancelDeleteAccountBtn.addEventListener('click',function(){
+  axConfirm(t('set.cancel_delete_confirm')||'确定撤销注销申请？').then(function(ok){
+  if(!ok) return;
+  cancelDeleteAccountBtn.disabled=true;
+  cancelAccountDeletion().then(function(){
+    toast(t('set.delete_cancelled')||'已撤销注销');
+    refreshDeleteAccountUI();
+  }).catch(function(){
+    toast(t('toast.op_fail')||'操作失败');
+  }).finally(function(){ cancelDeleteAccountBtn.disabled=false; });
+  });
+});
+try{ refreshDeleteAccountUI(); }catch(e){}
+
+var clearExecBtn=$('clearExecCountBtn');
+if(clearExecBtn)clearExecBtn.addEventListener('click',function(){
+  axConfirm(t('set.clear_execs_confirm')||'确定将本机「已执行脚本」计数清零？').then(function(ok){
+  if(!ok)return;
+  try{
+    localStorage.setItem('andrux_total_execs','0');
+    /* 通知同页/其它标签的仪表盘刷新 */
+    try{ window.dispatchEvent(new StorageEvent('storage',{key:'andrux_total_execs',newValue:'0'})); }catch(e1){}
+    try{ window.dispatchEvent(new CustomEvent('andrux_exec_logged',{detail:{total:0}})); }catch(e2){}
+  }catch(e){}
+  toast(t('set.clear_execs_done')||'已清零');
+  });
+});
+
 var clearBtn=$('clearLocalBtn');
 if(clearBtn)clearBtn.addEventListener('click',function(){
-if(!confirm(t('misc.confirm_clear_local')))return;
+axConfirm(t('misc.confirm_clear_local')).then(function(ok){
+if(!ok)return;
 localStorage.removeItem('andrux_session');
 localStorage.removeItem('andrux_compact');
 localStorage.removeItem('andrux_reduce_motion');
@@ -1642,6 +2067,7 @@ localStorage.removeItem('andrux_poll_interval');
 sessionStorage.removeItem('andrux_admin_ok');
 sessionStorage.removeItem('andrux_human_ok');
 toast(t('toast.cleared'));
+});
 });
 
 /* Language switcher */
@@ -2328,13 +2754,14 @@ if(tabsList){
             if(execTabs.items[j].id===tid){cur=execTabs.items[j];break;}
           }
           if(!cur) return;
-          var nn=prompt(t('exec.rename_tab')||'更改名字', cur.name||'');
+          axPrompt(t('exec.rename_tab')||'更改名字', cur.name||'').then(function(nn){
           if(nn==null) return;
           nn=String(nn).trim().slice(0,24);
           if(!nn) return;
           cur.name=nn;
           execPersistTabs();
           execRenderTabs();
+          });
         }, 50);
       } else if(act==='delete'){
         execCloseTab(tid);
@@ -3047,8 +3474,14 @@ if(currentPage==='auth'){initSecurity();initAuth();return;}
 if(!session){location.href='../andrux-dashboard.html';return;}
 
 initNav();
+try{axEnhanceAllSelects();}catch(e){}
 initSecurity();
 startSessionWatch();
+try{
+  api(T_USERS,'?c0=eq.'+encodeURIComponent(session.id)+'&select=c0,c1,c5,delete_at',{skipRate:true}).then(function(rows){
+    if(rows&&rows[0]) processScheduledAccountDeletion(rows[0]);
+  }).catch(function(){});
+}catch(e){}
 
 if(currentPage==='dashboard')initDashboard();
 if(currentPage==='community')initCommunity();

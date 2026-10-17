@@ -550,8 +550,11 @@ function render(){
     if(delBtn){
       delBtn.onclick=function(e){
         e.stopPropagation();
-        if(!confirm(tt('sh.confirm_delete')+c.title+tt('sh.confirm_delete_end')))return;
-        deleteCard(c).then(function(){toast(tt('sh.card_deleted'));loadCards();}).catch(function(err){if(err&&err.message!=='no permission')toast(tt('sh.push_fail_conn'));});
+        var cardRef=c;
+        (window.axConfirm?window.axConfirm(tt('sh.confirm_delete')+cardRef.title+tt('sh.confirm_delete_end'),null,true):Promise.resolve(true)).then(function(ok){
+          if(!ok)return;
+          deleteCard(cardRef).then(function(){toast(tt('sh.card_deleted'));loadCards();}).catch(function(err){if(err&&err.message!=='no permission')toast(tt('sh.push_fail_conn'));});
+        });
       };
     }
 

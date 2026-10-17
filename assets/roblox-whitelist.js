@@ -418,7 +418,8 @@ else toast(t('rbx.bind_fail_prefix')+err);
 function doUnbind(robloxName){
 var user=getSession();
 if(!user){toast(t('rbx.please_login'));return;}
-if(!confirm(t('rbx.unbind_confirm')+robloxName+' ?'))return;
+(window.axConfirm?window.axConfirm(t('rbx.unbind_confirm')+robloxName+' ?',null,true):Promise.resolve(true)).then(function(ok){
+if(!ok)return;
 rpc('ax_unbind_roblox',{p_username:user,p_roblox_name:robloxName})
 .then(function(res){
 if(res&&res.ok){
@@ -431,6 +432,7 @@ loadBindings();
 }else{toast(t('rbx.unbind_fail'));}
 })
 .catch(function(e){toast(t('rbx.unbind_fail')+': '+(e.message||e));});
+});
 }
 
 var _wlInterval=false;

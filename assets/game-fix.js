@@ -159,16 +159,20 @@ var sessStr=localStorage.getItem('andrux_session')||'';
 var sess=null;
 try{sess=JSON.parse(sessStr);}catch(ex){}
 var by=sess?sess.username:'';
-if(!confirm(tt('admin.confirm_lock_ip')+' '+ip+' ?'))return;
+(window.axConfirm?window.axConfirm(tt('admin.confirm_lock_ip')+' '+ip+' ?',null,true):Promise.resolve(true)).then(function(ok){
+if(!ok)return;
 rpcCall('ax_ban_ip',{p_ip:ip,p_by:by}).then(function(){toast(tt('toast.ip_locked')+ip);}).catch(function(err){toast(tt('toast.ip_lock_fail')+err.message);});
+});
 return;
 }
 if(unlockBtn){
 e.preventDefault();e.stopPropagation();
 var ip=unlockBtn.getAttribute('data-ip');
 if(!ip||!ip.trim()){toast(tt('admin.no_ip_unlock'));return;}
-if(!confirm(tt('admin.confirm_unlock_ip')+' '+ip+' ?'))return;
+(window.axConfirm?window.axConfirm(tt('admin.confirm_unlock_ip')+' '+ip+' ?',null,true):Promise.resolve(true)).then(function(ok){
+if(!ok)return;
 rpcCall('ax_unban_ip',{p_ip:ip}).then(function(){toast(tt('toast.ip_unlocked')+ip);}).catch(function(err){toast(tt('toast.ip_unlock_fail')+err.message);});
+});
 return;
 }
 });

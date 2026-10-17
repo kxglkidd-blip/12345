@@ -198,7 +198,8 @@ else toast('绑定失败: '+err);
 function doUnbind(robloxName){
 var user=getSession();
 if(!user){toast('请先登录');return;}
-if(!confirm('确定解绑 '+robloxName+' ?'))return;
+(window.axConfirm?window.axConfirm('确定解绑 '+robloxName+' ?',null,true):Promise.resolve(true)).then(function(ok){
+if(!ok)return;
 rpc('ax_unbind_roblox',{p_username:user,p_roblox_name:robloxName})
 .then(function(res){
 if(res&&res.ok){
@@ -207,6 +208,7 @@ loadBindings();
 }else{toast('解绑失败');}
 })
 .catch(function(e){toast('解绑失败: '+(e.message||e));});
+});
 }
 
 function parseAsset(input){

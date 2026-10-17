@@ -487,7 +487,7 @@ function bindRobloxUsername(){
       if(status){status.textContent=msg;status.className='dash-rbx-status err';}
     }
   }).catch(function(e){
-    if(e&&e.dup){if(status){status.textContent=e.message;status.className='dash-rbx-status err';}try{alert(e.message);}catch(_){}return;}
+    if(e&&e.dup){if(status){status.textContent=e.message;status.className='dash-rbx-status err';}try{(window.axAlert?window.axAlert(e.message):alert(e.message));}catch(_){}return;}
     var m=(e&&e.message)?e.message:String(e||'未知错误');
     if(status){status.textContent='绑定失败: '+m;status.className='dash-rbx-status err';}
   }).then(function(){
@@ -571,14 +571,18 @@ setTimeout(function(){if(!$('metricGames')||_dashBooted)return;init();},800);
 // Same-tab live update when a script is pushed
 window.addEventListener('andrux_exec_logged',function(e){
   var n=e&&e.detail&&e.detail.total;
-  if(n!=null){execCount=Math.max(execCount,parseInt(n,10)||0);renderMetrics();}
+  if(n!=null){
+    var v=parseInt(n,10);
+    if(!isNaN(v)&&v>=0){execCount=v;renderMetrics();}
+  }
 });
 
 // React to storage changes from other tabs
 window.addEventListener('storage',function(e){
   if(e.key==='andrux_game_list')refreshAll();
   if(e.key==='andrux_total_execs'){
-    execCount=Math.max(execCount,parseInt(e.newValue||'0',10)||0);
+    execCount=parseInt(e.newValue||'0',10)||0;
+    if(isNaN(execCount)||execCount<0)execCount=0;
     renderMetrics();
   }
   if(e.key==='andrux_lang'){

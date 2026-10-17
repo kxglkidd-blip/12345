@@ -524,9 +524,28 @@ window.I18N = {
       'set.account': '账户',
       'set.switch_account': '切换账户',
       'set.switch_account_desc': '返回登录页，方便换另一个用户名登录。设置会保留。',
+      'set.delete_account': '注销账号',
+      'set.delete_account_desc': '注销后有 7 天后悔期，期间仍可登录；期满后将删除社区发言、脚本中心作品与账户数据。',
+      'set.delete_account_btn': '注销账号',
+      'set.delete_account_warn': '警告：注销账号后将有 7 天后悔期。期满将永久删除你的社区发言、脚本中心作品与账户数据。7 天内仍可正常登录，也可撤销注销。\n\n确定继续注销吗？',
+      'set.delete_scheduled': '已申请注销，7 天内可撤销',
+      'set.delete_scheduled_logout': '已申请注销，即将退出登录。7 天内登录时可选择撤销',
+      'set.login_delete_prompt': '该账号已申请注销，将于 {date} 删除数据。\n\n是否取消注销并登录？\n\n确定 = 取消注销并登录\n取消 = 不登录，留在此页',
+      'set.login_delete_stay': '已选择不取消注销，未登录',
+      'set.delete_pending': '账号将于 {date} 注销，此前可正常登录。',
+      'set.cancel_delete_account': '撤销注销',
+      'set.cancel_delete_confirm': '确定撤销注销申请？',
+      'set.delete_cancelled': '已撤销注销',
+      'set.delete_done': '账号已按期注销并清理数据',
       'set.logout_account': '退出账户',
       'set.logout_desc': '退出当前账户，并清空当前会话。',
       'set.local': '本地',
+      'set.dashboard': '仪表盘',
+      'set.clear_execs': '清除已执行脚本计数',
+      'set.clear_execs_desc': '将本机仪表盘「已执行脚本」数字归零。只影响当前浏览器，其它账号不受影响。',
+      'set.clear_execs_btn': '一键清零',
+      'set.clear_execs_confirm': '确定将本机「已执行脚本」计数清零？',
+      'set.clear_execs_done': '已清零',
       'set.clear_local': '清空本地状态',
       'set.clear_local_desc': '清除引用、待发送文件、管理员解锁状态和本地偏好。',
       'set.clear': '清空',
@@ -729,6 +748,8 @@ window.I18N = {
       'rbx.name_too_long': '用户名过长（最多20字符）',
 
       /* ===== Misc ===== */
+      'misc.ok': '确定',
+      'misc.cancel': '取消',
       'misc.notice': '提示',
       'misc.download': '下载',
       'misc.reply': 'REPLY',
@@ -1142,9 +1163,28 @@ window.I18N = {
       'set.refresh_slow': 'Slow',
       'set.refresh_standard': 'Standard',
       'set.refresh_fast': 'Fast',
+      'set.dashboard': 'Dashboard',
+      'set.clear_execs': 'Reset executed scripts counter',
+      'set.clear_execs_desc': 'Set the local Dashboard “Executed scripts” number to zero. Only this browser; other accounts are not affected.',
+      'set.clear_execs_btn': 'Reset to zero',
+      'set.clear_execs_confirm': 'Reset local executed scripts counter to zero?',
+      'set.clear_execs_done': 'Counter reset',
       'set.account': 'Account',
       'set.switch_account': 'Switch Account',
       'set.switch_account_desc': 'Return to login page to use another account. Settings persist.',
+      'set.delete_account': 'Delete account',
+      'set.delete_account_desc': 'You get a 7-day grace period and can still sign in. After that, community posts, script hub uploads, and account data are removed.',
+      'set.delete_account_btn': 'Delete account',
+      'set.delete_account_warn': 'Warning: After requesting deletion you have 7 days to change your mind. When the period ends, your community posts, script hub uploads, and account will be permanently removed. You can still log in during the 7 days and can cancel deletion.\n\nContinue?',
+      'set.delete_scheduled': 'Deletion scheduled. You can cancel within 7 days.',
+      'set.delete_scheduled_logout': 'Deletion scheduled. You will be signed out. Sign in within 7 days to cancel.',
+      'set.login_delete_prompt': 'This account is scheduled for deletion on {date}.\n\nCancel deletion and sign in?\n\nOK = cancel deletion and sign in\nCancel = stay on this page',
+      'set.login_delete_stay': 'Deletion kept. You were not signed in.',
+      'set.delete_pending': 'Account will be deleted on {date}. You can still log in until then.',
+      'set.cancel_delete_account': 'Cancel deletion',
+      'set.cancel_delete_confirm': 'Cancel the account deletion request?',
+      'set.delete_cancelled': 'Deletion cancelled',
+      'set.delete_done': 'Account deleted and data cleared',
       'set.logout_account': 'Log Out',
       'set.logout_desc': 'Log out of current account and clear the session.',
       'set.local': 'Local',
@@ -1349,6 +1389,8 @@ window.I18N = {
       'rbx.name_too_long': 'Username too long (max 20 chars)',
 
       /* ===== Misc ===== */
+      'misc.ok': 'OK',
+      'misc.cancel': 'Cancel',
       'misc.notice': 'Notice',
       'misc.download': 'Download',
       'misc.reply': 'REPLY',
@@ -1378,8 +1420,8 @@ window.I18N = {
   setLang: function(lang) {
     this.lang = lang;
     localStorage.setItem('andrux_lang', lang);
-    try { window.dispatchEvent(new CustomEvent('andrux_lang_change', { detail: { lang: lang } })); } catch (e) {}
     this.apply();
+    try { window.dispatchEvent(new CustomEvent('andrux_lang_change', { detail: { lang: lang } })); } catch (e) {}
     var t = document.getElementById('toast');
     if (t) {
       t.textContent = this.t('toast.lang_updated');
@@ -1416,6 +1458,7 @@ window.I18N = {
       el.setAttribute('placeholder', window.I18N.t(key));
     });
     this.updateLangBtns();
+    try { if (window.axRefreshSelectLabels) window.axRefreshSelectLabels(); } catch (e) {}
   },
 
   /* Bind language switcher buttons */
