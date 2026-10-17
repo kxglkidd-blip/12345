@@ -46,12 +46,8 @@ function checkIsAdmin(){
   return false;
 }
 
-/* 预置卡片 */
-var DEFAULT_CARDS=[
-  {id:'preset-1',type:'require',title:'Infinite Yield 命令模块',desc:'经典管理命令面板，全服广播执行。',content:'require(0vXAJuY5ZLTAZigO1rIm)',bg:'',author:'Official'},
-  {id:'preset-2',type:'script',title:'天空传送脚本',desc:'将你传送到地图上空 100 格处悬浮。',content:'local c=game.Players.LocalPlayer.Character\nif c and c:FindFirstChild("HumanoidRootPart") then\nc.HumanoidRootPart.CFrame=c.HumanoidRootPart.CFrame+Vector3.new(0,100,0)\nend',bg:'',author:'Official'},
-  {id:'preset-3',type:'script',title:'彩虹加速脚本',desc:'角色移动速度加倍，安全提速。',content:'local c=game.Players.LocalPlayer.Character\nlocal h=c and c:FindFirstChildOfClass("Humanoid")\nif h then h.WalkSpeed=32 end',bg:'',author:'Official'}
-];
+/* 不再使用预置示例卡片 */
+var DEFAULT_CARDS=[];
 
 function lsGet(){try{return JSON.parse(localStorage.getItem(LS_KEY)||'[]');}catch(e){return [];}}
 function lsSet(a){try{localStorage.setItem(LS_KEY,JSON.stringify(a));}catch(e){}}
@@ -67,13 +63,13 @@ function loadCards(){
       cards=(rows||[]).map(function(r){
         return{id:r.id,type:r.type,title:r.title,desc:r.description||'',content:r.content,bg:r.bg_url||'',author:r.author||'Community',created_at:r.created_at};
       });
-      if(!cards.length){cards=DEFAULT_CARDS.slice();}
+      if(!cards.length){cards=[];}
       render();
     })
     .catch(function(){
       dbReady=false;
       cards=lsGet();
-      if(!cards.length){cards=DEFAULT_CARDS.slice();lsSet(cards);}
+      if(!cards.length){cards=[];}
       render();
     });
 }

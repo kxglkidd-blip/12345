@@ -78,24 +78,28 @@ function axShowModal(opts){
       if(mode==='alert'){
         mkBtn('primary-btn', opts.okText||okLabel, true);
       } else if(mode==='prompt'){
-        mkBtn('ghost-btn', opts.cancelText||cancelLabel, null);
-        mkBtn('primary-btn', opts.okText||okLabel, 'SUBMIT');
+        var cancelB=document.createElement('button');
+        cancelB.type='button'; cancelB.className='ghost-btn';
+        cancelB.textContent=opts.cancelText||cancelLabel;
+        cancelB.addEventListener('click', function(ev){ ev.preventDefault(); finish(null); });
+        actions.appendChild(cancelB);
+        var okB=document.createElement('button');
+        okB.type='button'; okB.className='primary-btn';
+        okB.textContent=opts.okText||okLabel;
+        okB.addEventListener('click', function(ev){
+          ev.preventDefault();
+          finish(input ? String(input.value) : '');
+        });
+        actions.appendChild(okB);
+        input.addEventListener('keydown', function(ev){
+          if(ev.key==='Enter'){ ev.preventDefault(); finish(String(input.value)); }
+        });
+        setTimeout(function(){ try{ input.focus(); input.select(); }catch(e){} }, 30);
       } else {
         mkBtn('ghost-btn', opts.cancelText||cancelLabel, false);
         mkBtn(opts.danger?'danger-btn':'primary-btn', opts.okText||okLabel, true);
       }
       root.onclick=function(e){ if(e.target===root) finish(mode==='confirm'?false:(mode==='alert'?true:null)); };
-      /* prompt: resolve input value on OK */
-      if(mode==='prompt'){
-        actions.querySelectorAll('button').forEach(function(b){
-          b.onclick=function(ev){
-            ev.preventDefault();
-            if(b.classList.contains('primary-btn')) finish(input.value);
-            else finish(null);
-          };
-        });
-        setTimeout(function(){ try{ input.focus(); input.select(); }catch(e){} }, 30);
-      }
       root.classList.add('is-open');
       requestAnimationFrame(function(){ root.classList.add('is-open'); });
     }catch(err){
@@ -756,6 +760,139 @@ return fetch(SU+'/rest/v1/banned_ips?select=ip&ip=eq.'+encodeURIComponent(ip),{h
 /* ===== Session guard ===== */
 
 /* 被管理员删除的账户：强制退出 */
+
+/* ===== Account ban (c5 = BAN / BAN:reason) ===== */
+function isUserBanned(u){
+  if(!u) return false;
+  if(u.banned===true || u.banned==='true' || u.banned===1) return true;
+  var c5=String(u.c5||'');
+  if(c5==='BAN' || c5.indexOf('BAN:')===0) return true;
+  return false;
+}
+function getBanReason(u){
+  var fallback=(t('val.account_banned')||'你已被封禁');
+  if(!u) return fallback;
+  var c5=String(u.c5||'');
+  if(c5.indexOf('BAN:')===0){
+    var r=c5.slice(4).trim();
+    if(r) return r;
+  }
+  return fallback;
+}
+function forceLogoutBanned(msg){
+  try{
+    localStorage.removeItem('andrux_session');
+    sessionStorage.removeItem('andrux_admin_ok');
+  }catch(e){}
+  session=null;
+  try{toast(msg||t('val.account_banned')||'你已被封禁');}catch(e){}
+  setTimeout(function(){ location.href='../andrux-dashboard.html'; }, 700);
+}
+function banUserAccount(uid, reason){
+  reason=String(reason==null?'':reason).trim();
+  if(reason==='SUBMIT' || reason==='true' || reason==='false') reason='';
+  var val=reason?('BAN:'+reason.slice(0,200)):'BAN';
+  return api(T_USERS,'?c0=eq.'+encodeURIComponent(uid),{
+    method:'PATCH', body:JSON.stringify({c5:val}), skipRate:true
+  }).then(function(){
+    return api(T_USERS,'?c0=eq.'+encodeURIComponent(uid)+'&select=c0,c5',{skipRate:true}).then(function(rows){
+      var u=rows&&rows[0];
+      if(!u||!isUserBanned(u)) throw new Error(t('toast.op_fail')||'封禁写入失败');
+      return u;
+    });
+  });
+}
+function unbanUserAccount(uid){
+  return api(T_USERS,'?c0=eq.'+encodeURIComponent(uid)+'&select=c0,c5',{skipRate:true}).then(function(rows){
+    var c5=rows&&rows[0]?String(rows[0].c5||''):'';
+    /* 仅清除封禁标记，保留注销 DEL: */
+    if(c5==='BAN' || c5.indexOf('BAN:')===0){
+      return api(T_USERS,'?c0=eq.'+encodeURIComponent(uid),{
+        method:'PATCH', body:JSON.stringify({c5:null}), skipRate:true
+      });
+    }
+    return null;
+  });
+}
+
+/* ===== Site announcement (ax_c3 c0=site_announcement, c1=纯文本) ===== */
+var ANNOUNCE_KEY='site_announcement';
+function parseAnnouncementRaw(raw){
+  if(raw==null || raw==='') return null;
+  if(typeof raw==='object' && raw.text) return {text:String(raw.text), id:String(raw.id||Date.now())};
+  var s=String(raw).trim();
+  if(!s) return null;
+  try{
+    var o=JSON.parse(s);
+    if(o && o.text) return {text:String(o.text), id:String(o.id||Date.now())};
+  }catch(e){}
+  return {text:s, id:String(Date.now())};
+}
+function loadAnnouncement(){
+  return api(T_CONFIG,'?c0=eq.'+encodeURIComponent(ANNOUNCE_KEY)+'&select=c0,c1',{skipRate:true}).then(function(rows){
+    if(!rows||!rows.length) return null;
+    return parseAnnouncementRaw(rows[0].c1);
+  }).catch(function(){ return null; });
+}
+function saveAnnouncement(text){
+  var plain=String(text||'').trim();
+  function doPatch(){
+    return api(T_CONFIG,'?c0=eq.'+encodeURIComponent(ANNOUNCE_KEY),{
+      method:'PATCH', body:JSON.stringify({c1:plain}), skipRate:true
+    });
+  }
+  function doPost(){
+    return api(T_CONFIG,'',{
+      method:'POST', body:JSON.stringify({c0:ANNOUNCE_KEY, c1:plain}), skipRate:true
+    });
+  }
+  return api(T_CONFIG,'?c0=eq.'+encodeURIComponent(ANNOUNCE_KEY)+'&select=c0',{skipRate:true}).then(function(rows){
+    if(rows&&rows.length) return doPatch();
+    return doPost().catch(function(){ return doPatch(); });
+  }).then(function(){
+    return loadAnnouncement().then(function(ann){
+      if(plain && !(ann&&ann.text)) throw new Error(t('admin.announce_save_fail')||'公告保存失败，请检查数据库权限');
+      return ann;
+    });
+  });
+}
+function renderAnnouncementBanner(ann){
+  var old=document.getElementById('axAnnounceBanner');
+  if(old) old.remove();
+  if(!ann||!ann.text) return;
+  var bar=document.createElement('div');
+  bar.id='axAnnounceBanner';
+  bar.className='ax-announce-banner';
+  bar.innerHTML='<div class="ax-announce-inner"><span class="ax-announce-tag">'+(t('admin.announce')||'公告')+'</span><span class="ax-announce-text"></span><button type="button" class="ax-announce-close" aria-label="close">×</button></div>';
+  bar.querySelector('.ax-announce-text').textContent=ann.text;
+  bar.querySelector('.ax-announce-close').addEventListener('click',function(){ bar.remove(); });
+  var host=document.getElementById('axAnnounceHost')
+    || document.querySelector('#dashboardPage')
+    || document.querySelector('.content')
+    || document.querySelector('main')
+    || document.body;
+  if(host.id==='axAnnounceHost' || host.id==='dashboardPage'){
+    host.insertBefore(bar, host.firstChild);
+  } else if(host.firstChild){
+    host.insertBefore(bar, host.firstChild);
+  } else {
+    host.appendChild(bar);
+  }
+}
+function initAnnouncementBanner(){
+  var onDash=false;
+  try{
+    if(typeof currentPage!=='undefined' && currentPage==='dashboard') onDash=true;
+    if((location.pathname||'').indexOf('dashboard')>=0) onDash=true;
+    if(document.getElementById('dashboardPage')) onDash=true;
+  }catch(e){}
+  if(!onDash) return;
+  loadAnnouncement().then(function(ann){
+    renderAnnouncementBanner(ann);
+  }).catch(function(){});
+}
+
+
 function forceLogoutDeleted(){
   try{
     localStorage.removeItem('andrux_session');
@@ -767,13 +904,30 @@ function forceLogoutDeleted(){
 }
 function validateSessionAlive(){
   if(!session||!session.id)return Promise.resolve(false);
-  return api(T_USERS,'?c0=eq.'+encodeURIComponent(session.id)+'&select=c0',{skipRate:true}).then(function(rows){
+  return api(T_USERS,'?c0=eq.'+encodeURIComponent(session.id)+'&select=c0,c5',{skipRate:true}).then(function(rows){
     if(!rows||!rows.length){
       forceLogoutDeleted();
       return false;
     }
+    if(isUserBanned(rows[0])){
+      forceLogoutBanned(getBanReason(rows[0]));
+      return false;
+    }
     return true;
-  }).catch(function(){return true;});
+  }).catch(function(){return true;}).then(function(ok){
+    if(ok===false) return false;
+    /* IP 封禁：在线也踢下线 */
+    return checkIPBan().then(function(banned){
+      if(banned){
+        try{ localStorage.removeItem('andrux_session'); sessionStorage.removeItem('andrux_admin_ok'); }catch(e){}
+        session=null;
+        try{ toast(t('val.ip_banned')||'你的 IP 已被封禁'); }catch(e){}
+        setTimeout(function(){ location.href='../andrux-dashboard.html'; }, 700);
+        return false;
+      }
+      return true;
+    }).catch(function(){ return true; });
+  });
 }
 
 function requireSession(){
@@ -866,6 +1020,7 @@ if(!rows.length)throw new Error(t('val.login_fail'));
 return hashText(norm+':'+pass).then(function(hash){
 if(hash!==rows[0].c3)throw new Error(t('val.login_fail'));
 var urow=rows[0];
+if(isUserBanned(urow)) throw new Error(getBanReason(urow));
 return processScheduledAccountDeletion(urow).then(function(purged){
   if(purged) return;
   var at=getUserDeleteAt(urow);
@@ -955,6 +1110,7 @@ location.href='../andrux-dashboard.html';
 function initDashboard(){
 if(!requireSession())return;
 refreshStats();
+try{ initAnnouncementBanner(); }catch(e){}
 var refreshBtn=$('refreshBtn');
 if(refreshBtn)refreshBtn.addEventListener('click',refreshStats);
 }
@@ -1552,7 +1708,9 @@ else el.textContent=t('admin.mute_status_expired');}
 }).catch(function(){el.textContent=t('admin.mute_status_error');});
 }
 
-function loadAdminData(){loadAdminGames();loadAdminHubCards();loadAdminUsers();loadAdminMessages();}
+function loadAdminData(){
+try{initAnnounceAdmin();}catch(e){}
+loadAdminGames();loadAdminHubCards();loadAdminUsers();loadAdminMessages();}
 
 function loadAdminGames(){
 var container=$('adminGames');if(!container)return;
@@ -1617,19 +1775,68 @@ container.classList.add('ax-stagger');
 api(T_USERS,'?select=*&order=c6.desc').then(function(rows){
 if(!rows||!rows.length){container.innerHTML='<div class="notice">'+t('admin.no_users')+'</div>';return;}
 container.innerHTML=rows.map(function(u){
-var muted=u.c4?t('admin.muted_status'):t('admin.normal_status');
+var banned=isUserBanned(u);
+var banReason=banned?getBanReason(u):'';
+var muted=banned?(t('admin.banned_status')||'已封禁'):(u.c4?t('admin.muted_status'):t('admin.normal_status'));
 var ip=u.c8||'';
 return '<div class="admin-item" data-id="'+escapeAttr(u.c0)+'">'+
-'<div class="admin-item-top"><b>'+escapeHTML(u.c1)+'</b><span>'+muted+'</span></div>'+
+'<div class="admin-item-top"><b>'+escapeHTML(u.c1)+'</b><span>'+muted+(banned&&banReason?' · '+escapeHTML(banReason):'')+(ip?' · '+escapeHTML(ip):'')+'</span></div>'+
 '<div class="admin-actions">'+
 '<button class="mini-btn" data-action="view-profile" data-uid="'+escapeAttr(u.c0)+'">'+t('profile.view_profile')+'</button>'+
 '<button class="mini-btn" data-action="delete-user" data-uid="'+escapeAttr(u.c0)+'">'+t('admin.delete')+'</button>'+
+(banned
+  ?'<button class="mini-btn" data-action="unban-user" data-uid="'+escapeAttr(u.c0)+'">'+(t('admin.unban')||'解封')+'</button>'
+  :'<button class="mini-btn danger" data-action="ban-user" data-uid="'+escapeAttr(u.c0)+'">'+(t('admin.ban')||'封禁')+'</button>')+
 '<button class="mini-btn" data-action="mute-user" data-uid="'+escapeAttr(u.c0)+'">'+t('admin.mute')+'</button>'+
 '<button class="mini-btn" data-action="unmute-user" data-uid="'+escapeAttr(u.c0)+'">'+t('admin.unmute')+'</button>'+
 '<button class="mini-btn" data-action="clear-user-msgs" data-uid="'+escapeAttr(u.c0)+'">'+t('admin.clear_msgs')+'</button>'+
 '</div></div>';
 }).join('');
 }).catch(function(){container.innerHTML='<div class="notice bad">'+t('admin.load_fail')+'</div>';});
+}
+
+
+function refreshAnnounceAdminUI(){
+  loadAnnouncement().then(function(ann){
+    var input=$('announceInput');
+    var st=$('announceStatus');
+    if(input) input.value=ann&&ann.text?ann.text:'';
+    if(st) st.textContent=ann&&ann.text?(t('admin.announce_active')||'当前公告已开启'):(t('admin.announce_off')||'当前无公告');
+  }).catch(function(){});
+}
+function initAnnounceAdmin(){
+  var pub=$('announcePublishBtn');
+  var clr=$('announceClearBtn');
+  var ref=$('adminRefreshAnnounce');
+  if(pub) pub.addEventListener('click',function(){
+    var input=$('announceInput');
+    var text=input?String(input.value||'').trim():'';
+    if(!text){ toast(t('admin.announce_empty')||'请输入公告内容'); return; }
+    pub.disabled=true;
+    saveAnnouncement(text).then(function(ann){
+      toast(t('admin.announce_published')||'公告已发布');
+      refreshAnnounceAdminUI();
+      try{
+        if(typeof currentPage!=='undefined' && currentPage==='dashboard') initAnnouncementBanner();
+      }catch(e){}
+    }).catch(function(err){
+      toast((err&&err.message)||t('toast.op_fail')||'操作失败');
+    })
+    .finally(function(){ pub.disabled=false; });
+  });
+  if(clr) clr.addEventListener('click',function(){
+    axConfirm(t('admin.announce_clear_confirm')||'确定关闭全站公告？').then(function(ok){
+      if(!ok) return;
+      saveAnnouncement('').then(function(){
+        toast(t('admin.announce_cleared')||'公告已关闭');
+        refreshAnnounceAdminUI();
+        var bar=document.getElementById('axAnnounceBanner');
+        if(bar) bar.remove();
+      }).catch(function(){ toast(t('toast.op_fail')||'操作失败'); });
+    });
+  });
+  if(ref) ref.addEventListener('click', refreshAnnounceAdminUI);
+  refreshAnnounceAdminUI();
 }
 
 function loadAdminMessages(){
@@ -1710,6 +1917,25 @@ if(action==='unmute-user'&&uid){
 api(T_USERS,'?c0=eq.'+encodeURIComponent(uid),{method:'PATCH',body:JSON.stringify({c4:null})}).then(function(){
 toast(t('toast.unmuted'));loadAdminUsers();
 }).catch(function(){toast(t('toast.unmute_fail'));});
+}
+if(action==='ban-user'&&uid){
+axConfirm(t('admin.confirm_ban')||'确定封禁该玩家？对方将被强制下线，无法登录。',null,true).then(function(ok){
+if(!ok)return;
+return axPrompt(t('admin.ban_reason_prompt')||'封禁理由（可留空，默认：你已被封禁）','').then(function(reason){
+if(reason===null) return; /* 取消输入框 */
+banUserAccount(uid, reason).then(function(){
+toast(t('toast.user_banned')||'已封禁');loadAdminUsers();
+}).catch(function(){toast(t('toast.op_fail')||'操作失败');});
+});
+});
+}
+if(action==='unban-user'&&uid){
+axConfirm(t('admin.confirm_unban')||'确定解封该玩家？').then(function(ok){
+if(!ok)return;
+unbanUserAccount(uid).then(function(){
+toast(t('toast.user_unbanned')||'已解封');loadAdminUsers();
+}).catch(function(){toast(t('toast.op_fail')||'操作失败');});
+});
 }
 
 if(action==='clear-user-msgs'&&uid){
@@ -3323,12 +3549,17 @@ toast(t('profile.save_fail')+' ('+t('profile.need_sql')+')');
 
 /* ===== Session watchdog: kick deleted accounts ===== */
 function startSessionWatch(){
+try{
+  document.addEventListener('visibilitychange',function(){
+    if(document.visibilityState==='visible') try{validateSessionAlive();}catch(e){}
+  });
+}catch(e){}
 if(!session)return;
 if(sessionWatchStarted)return;
 sessionWatchStarted=true;
 validateSessionAlive();
 if(watchTimer){try{clearInterval(watchTimer);}catch(e){}}
-watchTimer=setInterval(function(){validateSessionAlive();},8000);
+watchTimer=setInterval(function(){validateSessionAlive();},2500);
 }
 
 /* ===== Global security ===== */
@@ -3483,7 +3714,7 @@ try{
   }).catch(function(){});
 }catch(e){}
 
-if(currentPage==='dashboard')initDashboard();
+if(currentPage==='dashboard'){initDashboard();try{initAnnouncementBanner();}catch(e){}}
 if(currentPage==='community')initCommunity();
 if(currentPage==='admin')initAdmin();
 if(currentPage==='settings')initSettings();
