@@ -960,6 +960,8 @@ if(rf)rf.classList.toggle('hidden',login);
 var regForm=$('registerForm');
 if(regForm)regForm.addEventListener('submit',function(e){
 e.preventDefault();
+var cfTok=(window.axGetTurnstileToken&&window.axGetTurnstileToken())||window.__cfTurnstileToken||'';
+if(!cfTok){setNotice($('registerNotice'),t('auth.turnstile_need')||'请先完成人机验证','bad');return;}
 var name=cleanName(($('registerName')||{}).value);
 var pass=($('registerPass')||{}).value||'';
 var err=validateUser(name,pass);
@@ -996,6 +998,7 @@ var msg=err2.message||'';
 if(msg.indexOf('duplicate')>=0)msg=t('val.user_exists');
 getIP().then(function(ip){rpcCall('record_login_attempt',{p_ip:ip,p_username:norm,p_success:false}).catch(function(){});});
 setNotice($('registerNotice'),msg,'bad');
+try{ if(window.axResetTurnstile) window.axResetTurnstile(); }catch(e){}
 });
 });
 
@@ -1003,6 +1006,8 @@ setNotice($('registerNotice'),msg,'bad');
 var loginForm=$('loginForm');
 if(loginForm)loginForm.addEventListener('submit',function(e){
 e.preventDefault();
+var cfTok=(window.axGetTurnstileToken&&window.axGetTurnstileToken())||window.__cfTurnstileToken||'';
+if(!cfTok){setNotice($('loginNotice'),t('auth.turnstile_need')||'请先完成人机验证','bad');return;}
 var name=cleanName(($('loginName')||{}).value);
 var pass=($('loginPass')||{}).value||'';
 var norm=normalizedName(name);
@@ -1051,6 +1056,7 @@ return processScheduledAccountDeletion(urow).then(function(purged){
 }).catch(function(err){
 getIP().then(function(ip){rpcCall('record_login_attempt',{p_ip:ip,p_username:norm,p_success:false}).catch(function(){});});
 setNotice($('loginNotice'),err.message,'bad');
+try{ if(window.axResetTurnstile) window.axResetTurnstile(); }catch(e){}
 });
 });
 }
