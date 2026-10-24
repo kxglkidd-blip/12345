@@ -690,13 +690,57 @@ function getAdminHash(){
 return ADMIN_HASH_PARTS.map(function(c){return('0'+c.toString(16)).slice(-2);}).join('');
 }
 
+/* 会话完整性：防止随便改 localStorage 冒充他人（仍可被读源码者伪造，但挡住随手改） */
+function sessionPepper(){
+  return 'ax.v1.'+getAdminHash().slice(0,20);
+}
+function makeSessionSig(id, username, loginAt){
+  return hashText([String(id||''), String(username||''), String(loginAt||''), sessionPepper()].join('|'));
+}
 function saveSession(user){
-session={id:user.c0,username:user.c1,login_at:new Date().toISOString(),fp:SEC.fpHash};
-localStorage.setItem('andrux_session',JSON.stringify(session));
+  var loginAt=new Date().toISOString();
+  session={id:user.c0,username:user.c1,login_at:loginAt,fp:SEC.fpHash||''};
+  return makeSessionSig(session.id, session.username, session.login_at).then(function(sig){
+    session.sig=sig;
+    localStorage.setItem('andrux_session',JSON.stringify(session));
+    return session;
+  }).catch(function(){
+    localStorage.setItem('andrux_session',JSON.stringify(session));
+    return session;
+  });
+}
+function loadSession(){
+  try{session=JSON.parse(localStorage.getItem('andrux_session')||'null');}catch(e){session=null;}
+}
+function verifySessionIntegrity(){
+  if(!session||!session.id||!session.username) return Promise.resolve(false);
+  if(!session.sig||!session.login_at) return Promise.resolve(false);
+  /* 会话最长 30 天 */
+  try{
+    var age=Date.now()-new Date(session.login_at).getTime();
+    if(isNaN(age)||age<0||age>30*24*60*60*1000) return Promise.resolve(false);
+  }catch(e){ return Promise.resolve(false); }
+  return makeSessionSig(session.id, session.username, session.login_at).then(function(sig){
+    return sig===session.sig;
+  }).catch(function(){ return false; });
 }
 
-function loadSession(){
-try{session=JSON.parse(localStorage.getItem('andrux_session')||'null');}catch(e){session=null;}
+/* 管理员解锁：禁止只用 sessionStorage='1' 绕过 */
+function adminUnlockToken(){
+  var day=Math.floor(Date.now()/(6*60*60*1000)); /* 6 小时桶 */
+  return hashText('adm|'+getAdminHash()+'|'+day+'|'+sessionPepper());
+}
+function setAdminUnlocked(){
+  return adminUnlockToken().then(function(tok){
+    try{ sessionStorage.setItem('andrux_admin_ok', tok); }catch(e){}
+    return tok;
+  });
+}
+function isAdminUnlocked(){
+  var cur='';
+  try{ cur=sessionStorage.getItem('andrux_admin_ok')||''; }catch(e){}
+  if(!cur||cur==='1') return Promise.resolve(false); /* 旧的简易标记一律作废 */
+  return adminUnlockToken().then(function(tok){ return cur===tok; }).catch(function(){ return false; });
 }
 
 /* ===== Supabase API (obfuscated table/field names) ===== */
@@ -904,19 +948,26 @@ function forceLogoutDeleted(){
 }
 function validateSessionAlive(){
   if(!session||!session.id)return Promise.resolve(false);
-  return api(T_USERS,'?c0=eq.'+encodeURIComponent(session.id)+'&select=c0,c5',{skipRate:true}).then(function(rows){
-    if(!rows||!rows.length){
-      forceLogoutDeleted();
+  return verifySessionIntegrity().then(function(ok){
+    if(!ok){
+      try{ localStorage.removeItem('andrux_session'); }catch(e){}
+      session=null;
+      try{ location.href='../andrux-dashboard.html'; }catch(e){}
       return false;
     }
-    if(isUserBanned(rows[0])){
-      forceLogoutBanned(getBanReason(rows[0]));
-      return false;
-    }
-    return true;
-  }).catch(function(){return true;}).then(function(ok){
+    return api(T_USERS,'?c0=eq.'+encodeURIComponent(session.id)+'&select=c0,c5',{skipRate:true}).then(function(rows){
+      if(!rows||!rows.length){
+        forceLogoutDeleted();
+        return false;
+      }
+      if(isUserBanned(rows[0])){
+        forceLogoutBanned(getBanReason(rows[0]));
+        return false;
+      }
+      return true;
+    }).catch(function(){ return true; });
+  }).then(function(ok){
     if(ok===false) return false;
-    /* IP 封禁：在线也踢下线 */
     return checkIPBan().then(function(banned){
       if(banned){
         try{ localStorage.removeItem('andrux_session'); sessionStorage.removeItem('andrux_admin_ok'); }catch(e){}
@@ -932,6 +983,13 @@ function validateSessionAlive(){
 
 function requireSession(){
 if(!session){location.href='../andrux-dashboard.html';return false;}
+verifySessionIntegrity().then(function(ok){
+  if(!ok){
+    try{ localStorage.removeItem('andrux_session'); }catch(e){}
+    session=null;
+    location.href='../andrux-dashboard.html';
+  }
+}).catch(function(){});
 try{startSessionWatch();}catch(e){try{validateSessionAlive();}catch(e2){}}
 return true;
 }
@@ -960,8 +1018,7 @@ if(rf)rf.classList.toggle('hidden',login);
 var regForm=$('registerForm');
 if(regForm)regForm.addEventListener('submit',function(e){
 e.preventDefault();
-var cfTok=(window.axGetTurnstileToken&&window.axGetTurnstileToken())||window.__cfTurnstileToken||'';
-if(!cfTok){setNotice($('registerNotice'),t('auth.turnstile_need')||'请先完成人机验证','bad');return;}
+if(!(window.axIsHumanOk?window.axIsHumanOk():false)){setNotice($('registerNotice'),t('auth.human_required')||'请先完成人机验证','bad');return;}
 var name=cleanName(($('registerName')||{}).value);
 var pass=($('registerPass')||{}).value||'';
 var err=validateUser(name,pass);
@@ -988,17 +1045,19 @@ return api(T_USERS,'',{method:'POST',body:JSON.stringify(payload)});
 });
 });
 }).then(function(rows){
-if(rows&&rows[0])saveSession(rows[0]);
+var row0=rows&&rows[0];
+return (row0?saveSession(row0):Promise.resolve()).then(function(){
 setNotice($('registerNotice'),t('auth.register_ok'),'ok');
 toast(t('toast.register_ok'));
 getIP().then(function(ip){rpcCall('record_login_attempt',{p_ip:ip,p_username:norm,p_success:true}).catch(function(){});});
 setTimeout(function(){location.href='./pages/dashboard.html';},300);
+});
 }).catch(function(err2){
 var msg=err2.message||'';
 if(msg.indexOf('duplicate')>=0)msg=t('val.user_exists');
 getIP().then(function(ip){rpcCall('record_login_attempt',{p_ip:ip,p_username:norm,p_success:false}).catch(function(){});});
 setNotice($('registerNotice'),msg,'bad');
-try{ if(window.axResetTurnstile) window.axResetTurnstile(); }catch(e){}
+try{ if(window.axResetHumanGate) window.axResetHumanGate(); }catch(e){}
 });
 });
 
@@ -1006,8 +1065,7 @@ try{ if(window.axResetTurnstile) window.axResetTurnstile(); }catch(e){}
 var loginForm=$('loginForm');
 if(loginForm)loginForm.addEventListener('submit',function(e){
 e.preventDefault();
-var cfTok=(window.axGetTurnstileToken&&window.axGetTurnstileToken())||window.__cfTurnstileToken||'';
-if(!cfTok){setNotice($('loginNotice'),t('auth.turnstile_need')||'请先完成人机验证','bad');return;}
+if(!(window.axIsHumanOk?window.axIsHumanOk():false)){setNotice($('loginNotice'),t('auth.human_required')||'请先完成人机验证','bad');return;}
 var name=cleanName(($('loginName')||{}).value);
 var pass=($('loginPass')||{}).value||'';
 var norm=normalizedName(name);
@@ -1038,25 +1096,27 @@ return processScheduledAccountDeletion(urow).then(function(purged){
         return;
       }
       return cancelAccountDeletion(urow.c0).then(function(){
-        saveSession(urow);
+        return saveSession(urow).then(function(){
         setNotice($('loginNotice'),t('auth.login_ok'),'ok');
         toast(t('set.delete_cancelled')||'已撤销注销');
         getIP().then(function(ip){rpcCall('record_login_attempt',{p_ip:ip,p_username:norm,p_success:true}).catch(function(){});});
         setTimeout(function(){location.href='./pages/dashboard.html';},300);
+        });
       });
     });
   }
-  saveSession(urow);
+  return saveSession(urow).then(function(){
   setNotice($('loginNotice'),t('auth.login_ok'),'ok');
   toast(t('toast.login_ok'));
   getIP().then(function(ip){rpcCall('record_login_attempt',{p_ip:ip,p_username:norm,p_success:true}).catch(function(){});});
   setTimeout(function(){location.href='./pages/dashboard.html';},300);
+  });
 });
 });
 }).catch(function(err){
 getIP().then(function(ip){rpcCall('record_login_attempt',{p_ip:ip,p_username:norm,p_success:false}).catch(function(){});});
 setNotice($('loginNotice'),err.message,'bad');
-try{ if(window.axResetTurnstile) window.axResetTurnstile(); }catch(e){}
+try{ if(window.axResetHumanGate) window.axResetHumanGate(); }catch(e){}
 });
 });
 }
@@ -1644,10 +1704,10 @@ var panel=$('adminPanel');
 var form=$('adminLoginForm');
 if(!lock||!panel||!form)return;
 
-/* Check if already unlocked this session */
-if(sessionStorage.getItem('andrux_admin_ok')==='1'){
-lock.classList.add('hidden');panel.classList.remove('hidden');loadAdminData();
-}
+/* Check if already unlocked this session (time-bound token) */
+isAdminUnlocked().then(function(ok){
+  if(ok){ lock.classList.add('hidden');panel.classList.remove('hidden');loadAdminData(); }
+}).catch(function(){});
 
 form.addEventListener('submit',function(e){
 e.preventDefault();
@@ -1655,9 +1715,10 @@ var pw=($('adminPassword')||{}).value||'';
 if(hashText(pw.toLowerCase()).then){
 hashText(pw.toLowerCase()).then(function(hash){
 if(hash===getAdminHash()){
-sessionStorage.setItem('andrux_admin_ok','1');
+setAdminUnlocked().then(function(){
 lock.classList.add('hidden');panel.classList.remove('hidden');
 toast(t('toast.password_ok'));loadAdminData();
+});
 }else{setNotice($('adminNotice'),t('toast.password_err'),'bad');}
 });
 }
@@ -1715,6 +1776,19 @@ else el.textContent=t('admin.mute_status_expired');}
 }
 
 function loadAdminData(){
+isAdminUnlocked().then(function(ok){
+  if(!ok){
+    try{
+      var lock=$('adminLock'); var panel=$('adminPanel');
+      if(lock) lock.classList.remove('hidden');
+      if(panel) panel.classList.add('hidden');
+    }catch(e){}
+    return;
+  }
+  _loadAdminDataInner();
+}).catch(function(){});
+}
+function _loadAdminDataInner(){
 try{initAnnounceAdmin();}catch(e){}
 loadAdminGames();loadAdminHubCards();loadAdminUsers();loadAdminMessages();}
 
